@@ -1,0 +1,290 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Auto Learn</title>
+  <style>
+    :root { color-scheme: light; --bg:#f6f7f9; --panel:#fff; --text:#20242a; --muted:#657080; --line:#dfe4ea; --brand:#1f7a65; --danger:#b42318; --blue:#2563eb; }
+    * { box-sizing: border-box; }
+    body { margin:0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background:var(--bg); color:var(--text); }
+    header { height:64px; display:flex; align-items:center; justify-content:space-between; padding:0 28px; border-bottom:1px solid var(--line); background:#fff; }
+    h1 { font-size:20px; margin:0; letter-spacing:0; }
+    main { max-width:1180px; margin:0 auto; padding:24px; display:grid; grid-template-columns: 380px 1fr; gap:20px; }
+    section { background:var(--panel); border:1px solid var(--line); border-radius:8px; padding:18px; }
+    h2 { font-size:15px; margin:0 0 14px; }
+    label { display:block; font-size:13px; color:var(--muted); margin:12px 0 6px; }
+    select, input { width:100%; min-height:38px; border:1px solid var(--line); border-radius:6px; padding:8px 10px; font-size:14px; background:#fff; }
+    input[type="checkbox"] { width:auto; min-height:0; }
+    .row { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+    .check { display:flex; gap:8px; align-items:center; margin-top:12px; color:var(--text); font-size:14px; }
+    button { border:1px solid transparent; border-radius:6px; padding:9px 12px; font-size:14px; cursor:pointer; background:var(--brand); color:#fff; }
+    button.secondary { background:#fff; color:var(--text); border-color:var(--line); }
+    button.danger { background:var(--danger); }
+    button:disabled { opacity:.55; cursor:not-allowed; }
+    .actions { display:flex; gap:10px; margin-top:16px; flex-wrap:wrap; }
+    .status { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:12px; }
+    .pill { border:1px solid var(--line); border-radius:999px; padding:4px 10px; font-size:12px; color:var(--muted); background:#fafafa; }
+    .job-list { display:grid; gap:8px; margin-bottom:12px; }
+    .job-item { display:grid; grid-template-columns:1fr auto; gap:8px; align-items:center; border:1px solid var(--line); border-radius:6px; padding:8px 10px; background:#fafafa; font-size:13px; cursor:pointer; text-align:left; color:var(--text); }
+    .job-item.active { border-color:var(--brand); background:#eef8f4; }
+    .job-item strong { display:block; font-size:13px; }
+    .job-meta { color:var(--muted); font-size:12px; margin-top:2px; }
+    .detail { display:grid; grid-template-columns:90px 1fr; gap:8px; border:1px solid var(--line); border-radius:6px; padding:12px; margin-bottom:12px; background:#fff; font-size:13px; }
+    .detail span:nth-child(odd) { color:var(--muted); }
+    .detail span:nth-child(even) { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    pre { height:620px; margin:0; overflow:auto; background:#101418; color:#d7e0ea; border-radius:6px; padding:14px; font:12px/1.55 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; white-space:pre-wrap; }
+    .hint { font-size:12px; line-height:1.5; color:var(--muted); margin-top:8px; }
+    @media (max-width: 900px) { main { grid-template-columns:1fr; padding:14px; } header { padding:0 16px; } pre { height:420px; } }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>自动学习控制台</h1>
+    <span class="pill" id="clock"></span>
+  </header>
+  <main>
+    <section>
+      <h2>任务设置</h2>
+      <label>学员</label>
+      <select id="user"></select>
+      <div class="row">
+        <div>
+          <label>任务</label>
+          <select id="action">
+            <option value="learn">自动学习</option>
+            <option value="add_course">添加课程</option>
+            <option value="cancel_course">取消未开始课程</option>
+          </select>
+        </div>
+        <div>
+          <label>课程类型</label>
+          <select id="courseType">
+            <option value="">全部</option>
+            <option value="CT2017110000000074">公需课</option>
+            <option value="CT2017110000000075">知识更新工程专题</option>
+          </select>
+        </div>
+      </div>
+      <div class="row">
+        <div>
+          <label>年份</label>
+          <input id="year" type="number" min="2020">
+        </div>
+        <div>
+          <label>目标学时</label>
+          <input id="credit" type="number" min="0" step="0.5" value="30">
+        </div>
+      </div>
+      <label>学习时间窗</label>
+      <input id="windows" placeholder="例如 08:00-12:00,19:00-22:30">
+      <div class="hint">留空表示立刻运行。跨天可写 22:00-01:00。</div>
+      <label class="check"><input id="finishExam" type="checkbox" checked> 视频完成后自动收集题库并答题</label>
+      <label class="check"><input id="keepSchedule" type="checkbox" checked> 不在学习时间内时保持等待，到点自动继续</label>
+      <div class="actions">
+        <button id="start">开始任务</button>
+        <button class="danger" id="stop">停止任务</button>
+        <button class="secondary" id="updateSchedule">更新时间窗</button>
+        <button class="secondary" id="refreshUsers">刷新用户</button>
+      </div>
+
+      <h2 style="margin-top:24px;">添加学员</h2>
+      <label>authCode</label>
+      <input id="authCode" placeholder="粘贴登录跳转地址里的 authCode">
+      <div class="actions">
+        <button class="secondary" id="createUser">保存学员</button>
+      </div>
+      <div class="hint">Docker 部署后请只放在可信网络或反代鉴权后面，用户文件里包含登录参数。</div>
+    </section>
+    <section>
+      <div class="status">
+        <h2>学习概览</h2>
+        <span class="pill" id="state">idle</span>
+      </div>
+      <div class="job-list" id="jobList"></div>
+      <div class="status">
+        <h2>当前学员状态</h2>
+      </div>
+      <div class="detail" id="jobDetail"></div>
+      <pre id="logs"></pre>
+    </section>
+  </main>
+<script>
+const $ = (id) => document.getElementById(id);
+const nowYear = new Date().getFullYear();
+let latestJobs = [];
+let selectedUserFile = "";
+let usersByFile = {};
+$("year").value = nowYear;
+
+async function requestJson(url, options = {}) {
+  const res = await fetch(url, {headers: {"Content-Type":"application/json"}, ...options});
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.detail || "请求失败");
+  return data;
+}
+
+async function loadUsers() {
+  const data = await requestJson("/api/users");
+  usersByFile = Object.fromEntries((data.users || []).map(user => [user.file, user]));
+  $("user").innerHTML = data.users.map(u => `<option value="${u.file}">${u.username}</option>`).join("");
+  if (!data.users.length) $("user").innerHTML = `<option value="">暂无学员</option>`;
+  if (selectedUserFile) $("user").value = selectedUserFile;
+  if (!selectedUserFile) selectedUserFile = $("user").value;
+  applySelectedSchedule();
+}
+
+async function pollState() {
+  try {
+    const state = await requestJson("/api/state");
+    latestJobs = state.jobs || [];
+    renderJobs();
+  } catch (err) {
+    $("state").textContent = err.message;
+  }
+}
+
+function selectedJob() {
+  const userFile = selectedUserFile || $("user").value;
+  return latestJobs.find(job => job.user_file === userFile) || null;
+}
+
+function selectedUserConfig() {
+  return usersByFile[selectedUserFile || $("user").value] || null;
+}
+
+function applySelectedSchedule() {
+  if (document.activeElement === $("windows")) return;
+  const job = selectedJob();
+  const config = job || selectedUserConfig();
+  $("windows").value = config?.study_windows || "";
+  $("keepSchedule").checked = config?.keep_schedule !== false;
+}
+
+function escapeHtml(value) {
+  return String(value ?? "").replace(/[&<>"']/g, (char) => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;" }[char]));
+}
+
+function actionText(action) {
+  return {learn: "自动学习", add_course: "添加课程", cancel_course: "取消课程"}[action] || action || "-";
+}
+
+function progressText(job) {
+  if (!job) return "-";
+  if (job.total_courses > 0 && job.course_index > 0) return `${job.course_index}/${job.total_courses}`;
+  if (job.total_courses > 0) return `0/${job.total_courses}`;
+  return "-";
+}
+
+function renderJobs() {
+  if (!selectedUserFile) selectedUserFile = $("user").value;
+  const job = selectedJob();
+  applySelectedSchedule();
+  const selectedRunning = Boolean(job && job.user_file === selectedUserFile && job.running);
+  const runningCount = latestJobs.filter(item => item.running).length;
+  const selectedName = $("user").options[$("user").selectedIndex]?.text || selectedUserFile || "未选择";
+  $("state").textContent = job ? `${job.username || job.user_file} · ${job.current_step || job.status}`.trim() : `${selectedName} · 暂无任务`;
+  $("logs").textContent = job ? job.logs.join("\n") : "";
+  $("logs").scrollTop = $("logs").scrollHeight;
+  $("start").disabled = selectedRunning || !$("user").value;
+  $("stop").disabled = !selectedRunning;
+  const sortedJobs = [...latestJobs].sort((a, b) => Number(b.running) - Number(a.running));
+  $("jobList").innerHTML = sortedJobs.map(item => `
+    <button class="job-item ${item.user_file === selectedUserFile ? "active" : ""}" data-user-file="${escapeHtml(item.user_file)}">
+      <div>
+        <strong>${escapeHtml(item.username || item.user_file)}</strong>
+        <div class="job-meta">${escapeHtml(actionText(item.action))} · ${escapeHtml(item.current_step || item.message || item.status || "-")} · ${escapeHtml(progressText(item))}</div>
+        <div class="job-meta">${escapeHtml(item.current_course || "尚未进入课程")}</div>
+        <div class="job-meta">时间窗：${escapeHtml(item.study_windows || "全天")}</div>
+      </div>
+      <span class="pill">${item.running ? "运行中" : escapeHtml(item.status)}</span>
+    </button>
+  `).join("");
+  if (!latestJobs.length) $("jobList").innerHTML = `<div class="hint">暂无任务。不同学员可以同时运行，同一学员只能运行一个任务。</div>`;
+  $("jobList").querySelectorAll(".job-item").forEach(item => {
+    item.onclick = () => {
+      selectedUserFile = item.dataset.userFile;
+      $("user").value = selectedUserFile;
+      renderJobs();
+    };
+  });
+  $("jobDetail").innerHTML = job ? `
+    <span>学员</span><span>${escapeHtml(job.username || job.user_file)}</span>
+    <span>任务</span><span>${escapeHtml(actionText(job.action))}</span>
+    <span>阶段</span><span>${escapeHtml(job.current_step || job.message || job.status || "-")}</span>
+    <span>课程</span><span title="${escapeHtml(job.current_course || "")}">${escapeHtml(job.current_course || "尚未进入课程")}</span>
+    <span>进度</span><span>${escapeHtml(progressText(job))}</span>
+    <span>时间窗</span><span>${escapeHtml(job.study_windows || "全天")}</span>
+    <span>状态</span><span>${escapeHtml(job.message || job.status || "-")}</span>
+  ` : `
+    <span>学员</span><span>${escapeHtml(selectedName)}</span>
+    <span>阶段</span><span>暂无任务</span>
+    <span>课程</span><span>尚未开始</span>
+    <span>时间窗</span><span>${escapeHtml(selectedUserConfig()?.study_windows || "全天")}</span>
+  `;
+  if (runningCount > 0) $("clock").textContent = `${new Date().toLocaleString()} · ${runningCount} 个任务运行中`;
+}
+
+$("start").onclick = async () => {
+  try {
+    await requestJson("/api/jobs", {
+      method: "POST",
+      body: JSON.stringify({
+        action: $("action").value,
+        user_file: $("user").value,
+        finish_exam: $("finishExam").checked,
+        study_windows: $("windows").value,
+        keep_schedule: $("keepSchedule").checked,
+        course_type: $("courseType").value,
+        year: Number($("year").value || nowYear),
+        credit: Number($("credit").value || 30)
+      })
+    });
+    await pollState();
+  } catch (err) { alert(err.message); }
+};
+
+$("stop").onclick = async () => {
+  await requestJson("/api/jobs/stop", {method:"POST", body: JSON.stringify({user_file: $("user").value})});
+  await pollState();
+};
+$("updateSchedule").onclick = async () => {
+  try {
+    await requestJson("/api/jobs/schedule", {
+      method: "POST",
+      body: JSON.stringify({
+        user_file: $("user").value,
+        study_windows: $("windows").value,
+        keep_schedule: $("keepSchedule").checked
+      })
+    });
+    await loadUsers();
+    await pollState();
+  } catch (err) { alert(err.message); }
+};
+$("refreshUsers").onclick = loadUsers;
+$("user").onchange = () => {
+  selectedUserFile = $("user").value;
+  applySelectedSchedule();
+  renderJobs();
+};
+$("createUser").onclick = async () => {
+  try {
+    const created = await requestJson("/api/users", {method:"POST", body: JSON.stringify({auth_code: $("authCode").value})});
+    $("authCode").value = "";
+    selectedUserFile = created.file;
+    await loadUsers();
+    renderJobs();
+  } catch (err) { alert(err.message); }
+};
+
+setInterval(() => {
+  const runningCount = latestJobs.filter(item => item.running).length;
+  $("clock").textContent = runningCount > 0 ? `${new Date().toLocaleString()} · ${runningCount} 个任务运行中` : new Date().toLocaleString();
+}, 1000);
+setInterval(pollState, 2500);
+loadUsers();
+pollState();
+</script>
+</body>
+</html>

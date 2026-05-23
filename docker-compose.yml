@@ -1,0 +1,15 @@
+services:
+  auto-learn-web:
+    build: .
+    container_name: auto-learn-web
+    restart: unless-stopped
+    ports:
+      - "28000:28000"
+    environment:
+      TZ: Asia/Shanghai
+      PORT: "28000"
+      AUTO_LEARN_MAX_LOG_LINES: "1200"
+    volumes:
+      - ./users:/app/users
+      - ./Data:/app/Data
+      - ./.runtime:/app/.runtime
