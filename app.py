@@ -158,7 +158,7 @@ class JobState:
             self.current_step = "完成当前课程"
         elif "所有课程都已完成" in line:
             self.current_step = "全部完成"
-        elif "当前不在学习时间内" in line:
+        elif "当前不在学习时间内" in line or "当前不在允许学习时间内" in line:
             self.current_step = "等待学习时间"
         elif "正在登录认证" in line:
             self.current_step = "登录认证"

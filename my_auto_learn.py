@@ -2189,6 +2189,8 @@ class AutoStudyRefactored:
                             "  "
                         )
 
+                except StudyWindowClosed:
+                    raise
                 except Exception as e:
                     UIFormatter.print_formatted(
                         UIFormatter.error(f'处理出错: {str(e)[:50]}...', Icons.FAILURE),
@@ -2230,6 +2232,8 @@ class AutoStudyRefactored:
                     UIFormatter.warning(f"还有 {failed} 门课程需要处理", Icons.WARNING)
                 )
 
+        except StudyWindowClosed:
+            raise
         except Exception as e:
             UIFormatter.print_formatted(
                 UIFormatter.error(f"自动学习过程出错: {e}", Icons.FAILURE)
