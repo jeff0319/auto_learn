@@ -88,6 +88,8 @@ class JobState:
     current_course: str = ""
     course_index: int = 0
     total_courses: int = 0
+    remaining_courses: int = 0
+    business_failed: bool = False
     study_windows: str = ""
     keep_schedule: bool = True
     started_at: Optional[str] = None
@@ -138,6 +140,15 @@ class JobState:
         elif "获取课程信息" in line or "正在扫描课程列表" in line:
             self.current_step = "获取课程"
 
+        remaining_match = re.search(r'还有\s+(\d+)\s+门课程需要处理', line)
+        if remaining_match:
+            self.remaining_courses = int(remaining_match.group(1))
+            self.current_step = "任务未完成"
+
+        if any(keyword in line for keyword in ("章节失败", "视频学习失败", "考试失败", "题目收集失败", "最终考试失败")):
+            self.business_failed = True
+            self.current_step = "任务未完成"
+
     def snapshot(self) -> Dict[str, Any]:
         return {
             "id": self.id,
@@ -150,6 +161,7 @@ class JobState:
             "current_course": self.current_course,
             "course_index": self.course_index,
             "total_courses": self.total_courses,
+            "remaining_courses": self.remaining_courses,
             "study_windows": self.study_windows,
             "keep_schedule": self.keep_schedule,
             "started_at": self.started_at,
@@ -368,10 +380,15 @@ def run_job(job: JobState, payload: JobRequest):
             job.message = "任务已停止"
             job.current_step = "已停止"
         elif return_code == 0:
-            job.status = "success"
-            job.message = "任务完成"
-            if job.current_step != "全部完成":
-                job.current_step = "任务完成"
+            if job.business_failed or job.remaining_courses > 0:
+                job.status = "incomplete"
+                job.message = f"还有 {job.remaining_courses} 门课程需要处理" if job.remaining_courses > 0 else "任务未完成"
+                job.current_step = "任务未完成"
+            else:
+                job.status = "success"
+                job.message = "任务完成"
+                if job.current_step != "全部完成":
+                    job.current_step = "任务完成"
         else:
             job.status = "failed"
             job.message = f"任务退出码: {return_code}"
