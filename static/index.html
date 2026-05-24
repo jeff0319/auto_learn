@@ -61,7 +61,7 @@
             <option value="cancel_course">取消未开始课程</option>
           </select>
         </div>
-        <div>
+        <div id="courseTypeField">
           <label>课程类型</label>
           <select id="courseType">
             <option value="">全部</option>
@@ -70,7 +70,7 @@
           </select>
         </div>
       </div>
-      <div class="row">
+      <div class="row" id="addCourseFields">
         <div>
           <label>年份</label>
           <input id="year" type="number" min="2020">
@@ -124,6 +124,12 @@ let latestJobs = [];
 let selectedUserFile = "";
 let usersByFile = {};
 $("year").value = nowYear;
+
+function updateActionFields() {
+  const isAddCourse = $("action").value === "add_course";
+  $("courseTypeField").style.display = isAddCourse ? "block" : "none";
+  $("addCourseFields").style.display = isAddCourse ? "grid" : "none";
+}
 
 async function requestJson(url, options = {}) {
   const res = await fetch(url, {headers: {"Content-Type":"application/json"}, ...options});
@@ -290,6 +296,7 @@ $("user").onchange = () => {
   applySelectedSchedule();
   renderJobs();
 };
+$("action").onchange = updateActionFields;
 $("createUser").onclick = async () => {
   const authCode = $("authCode").value.trim();
   const button = $("createUser");
@@ -327,6 +334,7 @@ setInterval(() => {
 setInterval(pollState, 2500);
 loadUsers();
 pollState();
+updateActionFields();
 </script>
 </body>
 </html>

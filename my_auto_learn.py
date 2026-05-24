@@ -909,23 +909,44 @@ class CourseRepository:
 
         try:
             tree = etree.HTML(html)
+            if tree is None:
+                return course_lst, max_pages
+
             li_list = tree.xpath("/html/body/div[2]/div/ul/li")
             ex = 'ocid=(.+?)&'
 
             for item in li_list:
-                dic = {}
-                dic['title'] = item.xpath('./div[2]/div[1]/text()')[0]
-                dic['href'] = item.xpath('./div[2]/div[4]/div[2]/a/@href')[0]
-                dic['text'] = item.xpath('./div[2]/div[4]/div[2]/a/text()')[0]
-                dic['credit'] = item.xpath('./div[2]/div[3]/div[2]//span/text()')[0]
-                dic['ocid'] = re.findall(ex, dic['href'])[0]
-                course_lst.append(dic)
+                try:
+                    title = item.xpath('./div[2]/div[1]/text()')
+                    href = item.xpath('./div[2]/div[4]/div[2]/a/@href')
+                    text = item.xpath('./div[2]/div[4]/div[2]/a/text()')
+                    credit = item.xpath('./div[2]/div[3]/div[2]//span/text()')
+                    if not title or not href or not text or not credit:
+                        continue
+                    ocid_match = re.findall(ex, href[0])
+                    if not ocid_match:
+                        continue
+                    course_lst.append({
+                        'title': title[0],
+                        'href': href[0],
+                        'text': text[0],
+                        'credit': credit[0],
+                        'ocid': ocid_match[0],
+                    })
+                except Exception:
+                    continue
 
-            total_courses_txt = tree.xpath('//*[@id="selection-order"]/li[1]/a/text()')[0]
+            total_courses_texts = tree.xpath('//*[@id="selection-order"]/li[1]/a/text()')
+            if not total_courses_texts:
+                return course_lst, max_pages
+
             ex = '（(\\d+)）'
-            total_course_num = re.findall(ex, total_courses_txt)[0]
-            total_course_num = int(total_course_num)
-            max_pages = math.ceil(total_course_num / 10)
+            total_match = re.findall(ex, total_courses_texts[0])
+            if not total_match:
+                return course_lst, max_pages
+
+            total_course_num = int(total_match[0])
+            max_pages = math.ceil(total_course_num / 10) if total_course_num > 0 else 0
 
         except Exception as e:
             self.logger.error(f"解析课程列表页面失败: {e}")
@@ -1789,6 +1810,12 @@ class CourseManager:
         course_lst, max_pages = course_repo.get_course_list(rt=rt, year=year, page=1)
         total_course_lst.extend(course_lst)
 
+        if max_pages == 0 and not total_course_lst:
+            UIFormatter.print_formatted(
+                UIFormatter.status(f"{year} 年没有找到可添加的课程", "warning", Icons.WARNING)
+            )
+            return
+
         for p in range(2, max_pages + 1):
             course_lst, _ = course_repo.get_course_list(rt=rt, year=year, page=p)
             total_course_lst.extend(course_lst)
@@ -2548,6 +2575,36 @@ def select_exam() -> Optional[bool]:
             )
 
 
+def select_study_time_window() -> Optional[str]:
+    """选择 CLI 学习时间窗"""
+    default_window = '08:00-12:00,13:00-17:00,19:00-22:00'
+    UIFormatter.print_formatted(UIFormatter.section("学习时间设置", Icons.CLOCK))
+    UIFormatter.print_formatted(
+        UIFormatter.info(f"直接回车使用默认时间：{default_window}")
+    )
+    UIFormatter.print_formatted(
+        UIFormatter.info("支持跨天时间段，例如 22:00-01:00")
+    )
+
+    while True:
+        value = input(UIFormatter.input_prompt("允许学习时间", default_window)).strip()
+        if value == '':
+            value = default_window
+        if value in ('q', 'Q'):
+            UIFormatter.print_formatted(UIFormatter.info('退出程序', Icons.INFO))
+            return None
+        try:
+            window = StudyTimeWindow(value)
+            UIFormatter.print_formatted(
+                UIFormatter.success(f'已选择学习时间：{window.describe()}', Icons.CLOCK)
+            )
+            return value
+        except ValueError as e:
+            UIFormatter.print_formatted(
+                UIFormatter.warning(str(e), Icons.WARNING)
+            )
+
+
 def main():
     """主函数 - 统一输出风格"""
     user_folder = Path('./users')
@@ -2580,6 +2637,9 @@ def main():
             exam_flag = select_exam()
             if exam_flag is None:
                 return
+            study_time_window = select_study_time_window()
+            if study_time_window is None:
+                return
 
             UIFormatter.print_formatted(
                 UIFormatter.section('正在初始化自动学习系统', Icons.GEAR)
@@ -2587,7 +2647,8 @@ def main():
             auto_study = AutoStudyRefactored(
                 data_folder=data_folder,
                 username=username,
-                url_zxpx=url_zxpx
+                url_zxpx=url_zxpx,
+                study_time_window=study_time_window
             )
             UIFormatter.print_formatted(
                 UIFormatter.section('开始自动学习', Icons.ROCKET)
