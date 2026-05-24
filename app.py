@@ -82,12 +82,17 @@ class JobState:
     action: str = ""
     user_file: str = ""
     username: str = ""
+    finish_exam: bool = True
     status: str = "idle"
     message: str = ""
     current_step: str = "等待开始"
     current_course: str = ""
     course_index: int = 0
     total_courses: int = 0
+    current_chapter: str = ""
+    chapter_index: int = 0
+    total_chapters: int = 0
+    chapter_progress: int = 0
     remaining_courses: int = 0
     business_failed: bool = False
     study_windows: str = ""
@@ -114,8 +119,28 @@ class JobState:
             self.course_index = int(course_match.group(1))
             self.total_courses = int(course_match.group(2))
             self.current_course = course_match.group(3).strip()
+            self.current_chapter = ""
+            self.chapter_index = 0
+            self.total_chapters = 0
+            self.chapter_progress = 0
             self.current_step = "学习课程"
             return
+
+        chapter_match = re.search(r'第\s*(\d+)\s*/\s*(\d+)\s*章:\s*(.+?)(?:\s*\((\d+)%\))?$', line)
+        if chapter_match:
+            self.chapter_index = int(chapter_match.group(1))
+            self.total_chapters = int(chapter_match.group(2))
+            self.current_chapter = chapter_match.group(3).strip()
+            if chapter_match.group(4):
+                self.chapter_progress = int(chapter_match.group(4))
+            self.current_step = "观看视频"
+            return
+
+        chapter_done_match = re.search(r'章节完成:\s*(.+)$', line)
+        if chapter_done_match:
+            self.current_chapter = chapter_done_match.group(1).strip()
+            self.chapter_progress = 100
+            self.current_step = "完成当前章节"
 
         total_match = re.search(r'找到\s+(\d+)\s+门未完成课程', line)
         if total_match:
@@ -155,12 +180,17 @@ class JobState:
             "action": self.action,
             "user_file": self.user_file,
             "username": self.username,
+            "finish_exam": self.finish_exam,
             "status": self.status,
             "message": self.message,
             "current_step": self.current_step,
             "current_course": self.current_course,
             "course_index": self.course_index,
             "total_courses": self.total_courses,
+            "current_chapter": self.current_chapter,
+            "chapter_index": self.chapter_index,
+            "total_chapters": self.total_chapters,
+            "chapter_progress": self.chapter_progress,
             "remaining_courses": self.remaining_courses,
             "study_windows": self.study_windows,
             "keep_schedule": self.keep_schedule,
@@ -355,6 +385,7 @@ def run_job(job: JobState, payload: JobRequest):
     job.current_step = "启动任务"
     job.study_windows = payload.study_windows
     job.keep_schedule = payload.keep_schedule
+    job.finish_exam = payload.finish_exam
     write_schedule_control(payload.user_file, payload.study_windows, payload.keep_schedule)
 
     try:
@@ -465,6 +496,7 @@ def api_start_job(payload: JobRequest):
             action=payload.action,
             user_file=payload.user_file,
             username=username,
+            finish_exam=payload.finish_exam,
             study_windows=payload.study_windows,
             keep_schedule=payload.keep_schedule,
         )

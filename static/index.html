@@ -177,11 +177,24 @@ function actionText(action) {
   return {learn: "自动学习", add_course: "添加课程", cancel_course: "取消课程"}[action] || action || "-";
 }
 
+function taskModeText(job) {
+  if (!job) return "-";
+  if (job.action === "learn") return job.finish_exam ? "自动学习（视频+答题）" : "自动学习（仅视频）";
+  return actionText(job.action);
+}
+
 function progressText(job) {
   if (!job) return "-";
   if (job.total_courses > 0 && job.course_index > 0) return `${job.course_index}/${job.total_courses}`;
   if (job.total_courses > 0) return `0/${job.total_courses}`;
   return "-";
+}
+
+function chapterProgressText(job) {
+  if (!job) return "-";
+  const indexText = job.total_chapters > 0 && job.chapter_index > 0 ? `${job.chapter_index}/${job.total_chapters}` : "-";
+  const percentText = job.chapter_progress > 0 ? `${job.chapter_progress}%` : "";
+  return percentText ? `${indexText} · ${percentText}` : indexText;
 }
 
 function renderJobs() {
@@ -201,8 +214,9 @@ function renderJobs() {
     <button class="job-item ${item.user_file === selectedUserFile ? "active" : ""}" data-user-file="${escapeHtml(item.user_file)}">
       <div>
         <strong>${escapeHtml(item.username || item.user_file)}</strong>
-        <div class="job-meta">${escapeHtml(actionText(item.action))} · ${escapeHtml(item.current_step || item.message || item.status || "-")} · ${escapeHtml(progressText(item))}</div>
-        <div class="job-meta">${escapeHtml(item.current_course || "尚未进入课程")}</div>
+        <div class="job-meta">${escapeHtml(taskModeText(item))} · ${escapeHtml(item.current_step || item.message || item.status || "-")}</div>
+        <div class="job-meta">课程：${escapeHtml(progressText(item))} · ${escapeHtml(item.current_course || "尚未进入课程")}</div>
+        <div class="job-meta">章节：${escapeHtml(chapterProgressText(item))} · ${escapeHtml(item.current_chapter || "尚未进入章节")}</div>
         <div class="job-meta">时间窗：${escapeHtml(item.study_windows || "全天")}</div>
       </div>
       <span class="pill">${item.running ? "运行中" : escapeHtml(item.status)}</span>
@@ -218,10 +232,10 @@ function renderJobs() {
   });
   $("jobDetail").innerHTML = job ? `
     <span>学员</span><span>${escapeHtml(job.username || job.user_file)}</span>
-    <span>任务</span><span>${escapeHtml(actionText(job.action))}</span>
+    <span>任务</span><span>${escapeHtml(taskModeText(job))}</span>
     <span>阶段</span><span>${escapeHtml(job.current_step || job.message || job.status || "-")}</span>
-    <span>课程</span><span title="${escapeHtml(job.current_course || "")}">${escapeHtml(job.current_course || "尚未进入课程")}</span>
-    <span>进度</span><span>${escapeHtml(progressText(job))}</span>
+    <span>课程</span><span title="${escapeHtml(job.current_course || "")}">${escapeHtml(progressText(job))} · ${escapeHtml(job.current_course || "尚未进入课程")}</span>
+    <span>章节</span><span title="${escapeHtml(job.current_chapter || "")}">${escapeHtml(chapterProgressText(job))} · ${escapeHtml(job.current_chapter || "尚未进入章节")}</span>
     <span>时间窗</span><span>${escapeHtml(job.study_windows || "全天")}</span>
     <span>状态</span><span>${escapeHtml(job.message || job.status || "-")}</span>
   ` : `
