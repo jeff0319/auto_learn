@@ -538,6 +538,27 @@ class NetworkManager:
         # 测试网络连接
         self._test_connection()
 
+    def _request_with_retry(self, method: str, url: str, retries: int = 3, retry_delay: int = 10, **kwargs) -> requests.Response:
+        """带重试的网络请求，处理临时断网、超时等问题"""
+        last_error = None
+        for attempt in range(1, retries + 1):
+            try:
+                return self.session.request(method, url, verify=False, **kwargs)
+            except requests.exceptions.RequestException as e:
+                last_error = e
+                if attempt >= retries:
+                    break
+                wait_seconds = retry_delay * attempt
+                UIFormatter.print_formatted(
+                    UIFormatter.status(
+                        f"网络请求失败，{wait_seconds} 秒后重试 ({attempt}/{retries}): {e}",
+                        "warning",
+                        Icons.WARNING
+                    )
+                )
+                time.sleep(wait_seconds)
+        raise last_error
+
     def _test_connection(self):
         """测试网络连接 - 统一输出"""
         try:
@@ -572,10 +593,13 @@ class NetworkManager:
         try:
             if 'timeout' not in kwargs:
                 kwargs['timeout'] = 30
+            retries = kwargs.pop('retries', 3)
+            retry_delay = kwargs.pop('retry_delay', 10)
 
-            response = self.session.get(
-                url, headers=self.headers, cookies=self.cookies,
-                params=params, verify=False, **kwargs
+            response = self._request_with_retry(
+                'GET', url, retries=retries, retry_delay=retry_delay,
+                headers=self.headers, cookies=self.cookies,
+                params=params, **kwargs
             )
             return response
         except Exception as e:
@@ -588,10 +612,13 @@ class NetworkManager:
         try:
             if 'timeout' not in kwargs:
                 kwargs['timeout'] = 30
+            retries = kwargs.pop('retries', 3)
+            retry_delay = kwargs.pop('retry_delay', 10)
 
-            response = self.session.post(
-                url, headers=self.headers, cookies=self.cookies,
-                data=data, verify=False, **kwargs
+            response = self._request_with_retry(
+                'POST', url, retries=retries, retry_delay=retry_delay,
+                headers=self.headers, cookies=self.cookies,
+                data=data, **kwargs
             )
             return response
         except Exception as e:
