@@ -39,6 +39,10 @@
     .feedback.error { color:var(--danger); }
     pre { height:620px; margin:0; overflow:auto; background:#101418; color:#d7e0ea; border-radius:6px; padding:14px; font:12px/1.55 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; white-space:pre-wrap; }
     .hint { font-size:12px; line-height:1.5; color:var(--muted); margin-top:8px; }
+    details.auth-help { border:1px solid var(--line); border-radius:6px; padding:10px 12px; margin:8px 0 10px; background:#fafafa; }
+    details.auth-help summary { cursor:pointer; font-size:13px; color:var(--text); }
+    details.auth-help ol { margin:10px 0 0; padding-left:20px; color:var(--muted); font-size:12px; line-height:1.7; }
+    details.auth-help code { color:var(--text); }
     @media (max-width: 900px) { main { grid-template-columns:1fr; padding:14px; } header { padding:0 16px; } pre { height:420px; } }
   </style>
 </head>
@@ -93,11 +97,17 @@
       </div>
 
       <h2 style="margin-top:24px;">添加学员</h2>
+      <details class="auth-help">
+        <summary>如何获取 authCode</summary>
+        <ol>
+          <li>先进入 <code>https://rsj.nanjing.gov.cn/</code></li>
+          <li>点击右上角的“用户登陆”，登陆后跳转到 <code>https://m.mynj.cn:11097/plateform/rediectIndex/goods?authCode=XXXXXXX</code></li>
+          <li>复制 <code>authCode=</code> 后面所有的字符 <code>XXXXXXX</code></li>
+          <li>在下面粘贴第 3 步复制下来的 <code>XXXXXXX</code></li>
+        </ol>
+      </details>
       <label>authCode</label>
       <input id="authCode" placeholder="粘贴登录跳转地址里的 authCode">
-      <div class="hint">
-        获取方式：打开 <code>https://rsj.nanjing.gov.cn/</code>，点击右上角“用户登录”并完成登录；跳转后的地址通常包含 <code>authCode=XXXX</code>，复制等号后面的内容。
-      </div>
       <div class="actions">
         <button class="secondary" id="createUser">保存学员</button>
       </div>

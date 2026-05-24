@@ -2363,12 +2363,12 @@ def create_new_atl(path: Path) -> bool:
     """创建新的ATL文件 - 统一输出风格"""
     UIFormatter.print_formatted(UIFormatter.header("🔐 创建新用户", "═", 50))
 
-    entry_url = 'https://m.mynj.cn:11097/'
+    entry_url = 'https://rsj.nanjing.gov.cn/'
     jump_url = 'https://m.mynj.cn:11097/plateform/rediectIndex/goods?authCode=XXXXXXX'
 
     UIFormatter.print_formatted(UIFormatter.section("获取认证码步骤", Icons.INFO))
     UIFormatter.print_formatted(UIFormatter.numbered_item(1, f"先进入 {entry_url}"))
-    UIFormatter.print_formatted(UIFormatter.numbered_item(2, f"登陆后跳转到 {jump_url}"))
+    UIFormatter.print_formatted(UIFormatter.numbered_item(2, f'点击右上角的"用户登陆"，登陆后跳转到 {jump_url}'))
     UIFormatter.print_formatted(UIFormatter.numbered_item(3, '复制 "authCode=" 后面所有的字符 "XXXXXXX"'))
     UIFormatter.print_formatted(UIFormatter.numbered_item(4, '在下面粘贴第 3 步复制下来的 "XXXXXXX"'))
 
