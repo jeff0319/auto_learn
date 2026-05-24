@@ -34,6 +34,9 @@
     .detail { display:grid; grid-template-columns:90px 1fr; gap:8px; border:1px solid var(--line); border-radius:6px; padding:12px; margin-bottom:12px; background:#fff; font-size:13px; }
     .detail span:nth-child(odd) { color:var(--muted); }
     .detail span:nth-child(even) { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .feedback { min-height:20px; margin-top:8px; font-size:12px; line-height:1.5; color:var(--muted); }
+    .feedback.success { color:var(--brand); }
+    .feedback.error { color:var(--danger); }
     pre { height:620px; margin:0; overflow:auto; background:#101418; color:#d7e0ea; border-radius:6px; padding:14px; font:12px/1.55 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; white-space:pre-wrap; }
     .hint { font-size:12px; line-height:1.5; color:var(--muted); margin-top:8px; }
     @media (max-width: 900px) { main { grid-template-columns:1fr; padding:14px; } header { padding:0 16px; } pre { height:420px; } }
@@ -95,6 +98,7 @@
       <div class="actions">
         <button class="secondary" id="createUser">保存学员</button>
       </div>
+      <div class="feedback" id="createUserStatus"></div>
       <div class="hint">Docker 部署后请只放在可信网络或反代鉴权后面，用户文件里包含登录参数。</div>
     </section>
     <section>
@@ -270,13 +274,33 @@ $("user").onchange = () => {
   renderJobs();
 };
 $("createUser").onclick = async () => {
+  const authCode = $("authCode").value.trim();
+  const button = $("createUser");
+  const status = $("createUserStatus");
+  if (!authCode) {
+    status.textContent = "请输入 authCode。";
+    status.className = "feedback error";
+    return;
+  }
+  button.disabled = true;
+  button.textContent = "保存中...";
+  status.textContent = "正在验证 authCode 并创建学员，请稍候。";
+  status.className = "feedback";
   try {
-    const created = await requestJson("/api/users", {method:"POST", body: JSON.stringify({auth_code: $("authCode").value})});
+    const created = await requestJson("/api/users", {method:"POST", body: JSON.stringify({auth_code: authCode})});
     $("authCode").value = "";
     selectedUserFile = created.file;
     await loadUsers();
     renderJobs();
-  } catch (err) { alert(err.message); }
+    status.textContent = `学员 ${created.username || created.file} 已保存并选中。`;
+    status.className = "feedback success";
+  } catch (err) {
+    status.textContent = err.message;
+    status.className = "feedback error";
+  } finally {
+    button.disabled = false;
+    button.textContent = "保存学员";
+  }
 };
 
 setInterval(() => {
