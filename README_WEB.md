@@ -45,13 +45,18 @@ docker run -d --name auto-learn-web \
 docker compose up -d --build
 ```
 
-默认映射到宿主机 `28000` 端口，并挂载：
+默认映射到宿主机 `28000` 端口，并把当前项目目录挂载到容器的 `/app`：
 
 ```text
-./users    -> /app/users
-./Data     -> /app/Data
-./.runtime -> /app/.runtime
+. -> /app
 ```
+
+容器内的 `uvicorn` 已开启 `--reload`。因此在宿主机执行 `git pull` 或直接修改文件后：
+
+- 修改 `static/` 里的网页文件：刷新浏览器即可生效。
+- 修改 `app.py`、`my_auto_learn.py` 等 Python 代码：服务会自动 reload。
+- 修改 `Data/`、`users/`、`.runtime/` 内容：应用下次读取文件时生效，通常不需要 reload。
+- 修改 `requirements.txt`、`Dockerfile` 或系统依赖：仍需要重新执行 `docker compose up -d --build`。
 
 其中 `.runtime` 保存每个学员独立的学习时间窗等运行时设置。
 

@@ -9,7 +9,6 @@ services:
       TZ: Asia/Shanghai
       PORT: "28000"
       AUTO_LEARN_MAX_LOG_LINES: "1200"
+    command: uvicorn app:app --host 0.0.0.0 --port 28000 --reload
     volumes:
-      - ./users:/app/users
-      - ./Data:/app/Data
-      - ./.runtime:/app/.runtime
+      - .:/app
