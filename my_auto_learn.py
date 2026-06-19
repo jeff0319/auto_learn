@@ -1991,12 +1991,26 @@ class CourseManager:
 class LoginManager:
     """登录管理器 - 统一输出风格"""
 
+    CACHE_MAX_AGE_SECONDS = 8 * 60 * 60
+
     def __init__(self):
         self.UA = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/92.0.4515.159 Safari/537.36'
         self.logger = setup_logger(self.__class__.__name__)
 
-    def login_zxpx(self, url_zxpx: str) -> Tuple[dict, dict]:
+    def login_zxpx(self, url_zxpx: str, cache_path: Optional[Union[str, Path]] = None) -> Tuple[dict, dict]:
         """登录在线培训 - 统一输出风格"""
+        cached_session = self._load_cached_session(cache_path)
+        if cached_session:
+            cached_headers, cached_cookies = cached_session
+            if self._session_is_alive(cached_headers, cached_cookies):
+                UIFormatter.print_formatted(
+                    UIFormatter.status('复用在线登录状态', "success", Icons.SHIELD)
+                )
+                return cached_headers, cached_cookies
+            UIFormatter.print_formatted(
+                UIFormatter.status('登录状态已失效，重新登录认证', "warning", Icons.WARNING)
+            )
+
         headers = {
             'User-Agent': self.UA,
             'Accept': 'application/json, text/javascript, */*; q=0.01',
@@ -2012,7 +2026,10 @@ class LoginManager:
 
         try:
             response = session.get(url=url_zxpx, headers=headers, cookies=cookies, verify=False)
-            cookies.update(dict(response.history[0].cookies))
+            for history_response in response.history:
+                cookies.update(dict(history_response.cookies))
+            cookies.update(dict(response.cookies))
+            self._save_cached_session(cache_path, headers, cookies)
             return headers, cookies
         except Exception as e:
             UIFormatter.print_formatted(
@@ -2021,6 +2038,61 @@ class LoginManager:
             self.logger.error(f'登录失败: {e}')
             raise LoginException(f'登录失败: {e}')
 
+    def _load_cached_session(self, cache_path: Optional[Union[str, Path]]) -> Optional[Tuple[dict, dict]]:
+        if not cache_path:
+            return None
+        path = Path(cache_path)
+        if not path.exists():
+            return None
+        try:
+            data = json.loads(path.read_text(encoding='utf-8'))
+            if time.time() - float(data.get('saved_at', 0)) > self.CACHE_MAX_AGE_SECONDS:
+                return None
+            headers = data.get('headers') or {}
+            cookies = data.get('cookies') or {}
+            if not isinstance(headers, dict) or not isinstance(cookies, dict) or not cookies:
+                return None
+            return headers, cookies
+        except Exception as e:
+            self.logger.warning(f'读取登录缓存失败: {e}')
+            return None
+
+    def _save_cached_session(self, cache_path: Optional[Union[str, Path]], headers: dict, cookies: dict):
+        if not cache_path:
+            return
+        try:
+            path = Path(cache_path)
+            path.parent.mkdir(parents=True, exist_ok=True)
+            payload = {
+                'saved_at': time.time(),
+                'headers': headers,
+                'cookies': cookies,
+            }
+            path.write_text(json.dumps(payload, ensure_ascii=False), encoding='utf-8')
+        except Exception as e:
+            self.logger.warning(f'保存登录缓存失败: {e}')
+
+    def _session_is_alive(self, headers: dict, cookies: dict) -> bool:
+        try:
+            session = requests.session()
+            response = session.get(
+                'https://m.mynj.cn:11188/zxpx/auc/myCourse?state=1&page=1',
+                headers=headers,
+                cookies=cookies,
+                verify=False,
+                timeout=8,
+            )
+            if response.status_code not in (200, 404):
+                return False
+            final_url = response.url.lower()
+            if 'login' in final_url or 'freelogin' in final_url:
+                return False
+            text = response.text[:2000].lower()
+            return 'freelogin' not in text and 'authcode' not in text
+        except Exception as e:
+            self.logger.warning(f'登录缓存探活失败: {e}')
+            return False
+
 
 # ================ 主类 ================
 
@@ -2028,7 +2100,8 @@ class AutoStudyRefactored:
     """重构后的自动学习主类 - 统一输出风格"""
 
     def __init__(self, data_folder: Path, username: str = '我是谁？', url_zxpx: str = '',
-                 study_time_window: Optional[Union[StudyTimeWindow, str, List[dict], List[Tuple[str, str]]]] = None):
+                 study_time_window: Optional[Union[StudyTimeWindow, str, List[dict], List[Tuple[str, str]]]] = None,
+                 session_cache_path: Optional[Union[str, Path]] = None):
         self.username = username
         self.data_folder = data_folder
         self.delay_time = 30
@@ -2042,10 +2115,10 @@ class AutoStudyRefactored:
         try:
             # 初始化登录
             UIFormatter.print_formatted(
-                UIFormatter.status('正在登录认证', "progress", Icons.SHIELD)
+                UIFormatter.status('检查登录状态', "progress", Icons.SHIELD)
             )
             login_manager = LoginManager()
-            headers, cookies = login_manager.login_zxpx(url_zxpx)
+            headers, cookies = login_manager.login_zxpx(url_zxpx, cache_path=session_cache_path)
 
             if not headers or not cookies:
                 raise LoginException("登录失败：无法获取认证信息")

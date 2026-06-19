@@ -176,9 +176,15 @@ class JobState:
         elif "当前不在学习时间内" in line or "当前不在允许学习时间内" in line:
             self.current_step = "等待学习时间"
             self.start_wait_countdown()
-        elif "正在登录认证" in line:
+        elif "检查登录状态" in line:
+            self.clear_wait_countdown()
+            self.current_step = "检查登录状态"
+        elif "正在登录认证" in line or "重新登录认证" in line:
             self.clear_wait_countdown()
             self.current_step = "登录认证"
+        elif "复用在线登录状态" in line:
+            self.clear_wait_countdown()
+            self.current_step = "初始化服务"
         elif "获取课程信息" in line or "正在扫描课程列表" in line:
             self.clear_wait_countdown()
             self.current_step = "获取课程"
@@ -383,6 +389,12 @@ def control_path_for_user(user_file: str) -> Path:
     return RUNTIME_DIR / f"{safe_runtime_name(user_file)}.json"
 
 
+def session_cache_path_for_user(user_file: str) -> Path:
+    session_dir = RUNTIME_DIR / "sessions"
+    session_dir.mkdir(parents=True, exist_ok=True)
+    return session_dir / f"{safe_runtime_name(user_file)}.json"
+
+
 def write_schedule_control(user_file: str, study_windows: str, keep_schedule: bool):
     control_path_for_user(user_file).write_text(
         json.dumps({"study_windows": study_windows, "keep_schedule": keep_schedule}, ensure_ascii=False),
@@ -450,6 +462,7 @@ def execute_payload(payload: JobRequest):
                     username=username,
                     url_zxpx=url_zxpx,
                     study_time_window=guard,
+                    session_cache_path=session_cache_path_for_user(payload.user_file),
                 )
                 try:
                     auto_study.all_in_one(finish_exam=payload.finish_exam)
@@ -462,11 +475,21 @@ def execute_payload(payload: JobRequest):
             schedule_stop.set()
 
     elif payload.action == "add_course":
-        auto_study = module.AutoStudyRefactored(data_folder=DATA_DIR, username=username, url_zxpx=url_zxpx)
+        auto_study = module.AutoStudyRefactored(
+            data_folder=DATA_DIR,
+            username=username,
+            url_zxpx=url_zxpx,
+            session_cache_path=session_cache_path_for_user(payload.user_file),
+        )
         auto_study.add_course(rt=payload.course_type, year=payload.year, credit=payload.credit)
 
     elif payload.action == "cancel_course":
-        auto_study = module.AutoStudyRefactored(data_folder=DATA_DIR, username=username, url_zxpx=url_zxpx)
+        auto_study = module.AutoStudyRefactored(
+            data_folder=DATA_DIR,
+            username=username,
+            url_zxpx=url_zxpx,
+            session_cache_path=session_cache_path_for_user(payload.user_file),
+        )
         auto_study.cancel_all_course()
     else:
         raise ValueError("未知任务类型")
