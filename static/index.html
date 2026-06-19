@@ -19,9 +19,14 @@
     input[type="checkbox"] { width:auto; min-height:0; }
     .row { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
     .check { display:flex; gap:8px; align-items:center; margin-top:12px; color:var(--text); font-size:14px; }
-    button { border:1px solid transparent; border-radius:6px; padding:9px 12px; font-size:14px; cursor:pointer; background:var(--brand); color:#fff; }
+    button { border:1px solid transparent; border-radius:6px; padding:9px 12px; font-size:14px; cursor:pointer; background:var(--brand); color:#fff; transition:background-color .16s ease, border-color .16s ease, color .16s ease, box-shadow .16s ease, transform .12s ease; }
+    button:not(.secondary):not(.danger):not(.filter-button):hover:not(:disabled) { background:#17614f; color:#fff; box-shadow:0 2px 8px rgba(31,122,101,.18); transform:translateY(-1px); }
+    button:active:not(:disabled) { transform:translateY(0); box-shadow:0 1px 4px rgba(31,122,101,.16); }
+    button:focus-visible { outline:none; box-shadow:0 0 0 3px rgba(31,122,101,.18); }
     button.secondary { background:#fff; color:var(--text); border-color:var(--line); }
+    button.secondary:hover:not(:disabled) { background:#f7fbf9; color:var(--text); border-color:#b9dfd2; box-shadow:0 2px 8px rgba(32,36,42,.06); transform:translateY(-1px); }
     button.danger { background:var(--danger); }
+    button.danger:hover:not(:disabled) { background:#941b13; color:#fff; box-shadow:0 2px 8px rgba(180,35,24,.18); transform:translateY(-1px); }
     button:disabled { opacity:.55; cursor:not-allowed; }
     .actions { display:flex; gap:10px; margin-top:16px; flex-wrap:wrap; }
     .status { min-width:0; display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:12px; }
@@ -36,15 +41,15 @@
     .job-list { display:grid; gap:8px; margin-bottom:12px; }
     .student-name { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-weight:650; color:var(--text); }
     .job-meta { color:var(--muted); font-size:12px; margin-top:2px; }
-    .detail { position:relative; min-width:0; display:grid; grid-template-columns:90px minmax(0, 1fr); gap:8px; border:1px solid var(--line); border-radius:6px; padding:12px; margin-bottom:12px; background:#fff; font-size:13px; }
+    .detail { position:relative; min-width:0; display:grid; grid-template-columns:64px minmax(0, 1fr); column-gap:6px; row-gap:7px; border:1px solid var(--line); border-radius:6px; padding:12px; margin-bottom:12px; background:#fff; font-size:13px; line-height:1.45; }
     .detail.running { border-color:#b9dfd2; background:#f3fbf8; }
     .detail.success { border-color:#b9dfd2; background:#f3fbf8; }
     .detail.failed { border-color:#f0b8b2; background:#fff6f5; }
     .detail.incomplete { border-color:#f1d39b; background:#fffaf0; }
     .detail.stopped, .detail.idle { background:#fafafa; }
     .detail.has-pulse { padding-right:82px; }
-    .detail span:nth-child(odd) { color:var(--muted); }
-    .detail span:nth-child(even) { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .detail > span:nth-child(odd) { color:var(--muted); white-space:nowrap; }
+    .detail > span:nth-child(even) { min-width:0; overflow:visible; white-space:normal; overflow-wrap:anywhere; word-break:break-word; }
     .status-pulse { position:absolute; top:8px; right:12px; width:44px; height:44px; border-radius:50%; background:conic-gradient(from -90deg, var(--brand) var(--pulse-deg), #dfe9e6 0deg); display:grid; place-items:center; }
     .status-pulse::after { content:""; position:absolute; inset:5px; border-radius:inherit; background:#fff; }
     .pulse-inner { position:relative; z-index:1; display:grid; justify-items:center; color:#174f43; font-variant-numeric:tabular-nums; }
@@ -89,9 +94,11 @@
     .student-table .student-name { display:block; }
     .student-table .name-col { width:74px; }
     .student-table .status-col { width:92px; }
-    .student-table .progress-col { width:44px; text-align:center; }
+    .student-table .stage-col { width:auto; }
+    .student-table .progress-col { width:56px; text-align:center; }
     .student-table .stage-text { display:block; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--muted); }
     .student-table .state-pill { white-space:nowrap; }
+    .student-table td:last-child { text-align:center; }
     .student-table .progress-rings { margin-left:auto; margin-right:auto; }
     .add-student-module { margin-top:22px; padding-top:18px; border-top:1px solid var(--line); }
     .add-student-module h2 { margin-bottom:12px; }
@@ -106,7 +113,7 @@
     details.auth-help li { min-width:0; overflow-wrap:anywhere; }
     details.auth-help code { color:var(--text); white-space:normal; overflow-wrap:anywhere; word-break:break-word; }
     @keyframes statusFlow { from { background-position:0% 0; } to { background-position:200% 0; } }
-    @media (max-width: 900px) { main { grid-template-columns:minmax(0, 1fr); padding:14px; } header { padding:0 16px; } .detail { grid-template-columns:70px minmax(0, 1fr); } .detail.has-pulse { padding-right:78px; } pre { height:420px; } }
+    @media (max-width: 900px) { main { grid-template-columns:minmax(0, 1fr); padding:14px; } header { padding:0 16px; } .detail { grid-template-columns:60px minmax(0, 1fr); } .detail.has-pulse { padding-right:78px; } pre { height:420px; } }
   </style>
 </head>
 <body>
@@ -210,7 +217,7 @@ const $ = (id) => document.getElementById(id);
 const nowYear = new Date().getFullYear();
 let latestJobs = [];
 let selectedUserFile = "";
-let studentFilter = "all";
+let studentFilter = "running";
 let usersByFile = {};
 let videoTickAnchors = {};
 $("year").value = nowYear;
@@ -639,7 +646,7 @@ function renderJobs() {
   if (runningCount > 0) $("clock").textContent = `${new Date().toLocaleString()} · ${runningCount} 个任务运行中`;
 }
 
-$("start").onclick = async () => {
+async function startSelectedJob() {
   try {
     if (!selectedUserFile) return;
     await requestJson("/api/jobs", {
@@ -657,13 +664,16 @@ $("start").onclick = async () => {
     });
     await pollState();
   } catch (err) { alert(err.message); }
-};
+}
 
-$("stop").onclick = async () => {
+async function stopSelectedJob() {
   if (!selectedUserFile) return;
   await requestJson("/api/jobs/stop", {method:"POST", body: JSON.stringify({user_file: selectedUserFile})});
   await pollState();
-};
+}
+
+$("start").onclick = startSelectedJob;
+$("stop").onclick = stopSelectedJob;
 $("updateSchedule").onclick = async () => {
   if (!selectedUserFile) return;
   try {
@@ -725,9 +735,12 @@ setInterval(() => {
   updateLiveIndicators();
 }, 1000);
 setInterval(pollState, 2500);
-loadUsers();
-pollState();
-updateActionFields();
+async function initPage() {
+  updateActionFields();
+  await loadUsers();
+  await pollState();
+}
+initPage();
 </script>
 </body>
 </html>
