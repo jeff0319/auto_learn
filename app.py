@@ -93,12 +93,16 @@ class JobState:
     chapter_index: int = 0
     total_chapters: int = 0
     chapter_progress: int = 0
+    chapter_progress_updated_at: Optional[float] = None
     remaining_courses: int = 0
     business_failed: bool = False
     study_windows: str = ""
     keep_schedule: bool = True
     started_at: Optional[str] = None
     ended_at: Optional[str] = None
+    wait_started_at: Optional[float] = None
+    wait_total_seconds: int = 0
+    wait_until_at: Optional[float] = None
     logs: List[str] = field(default_factory=list)
     stop_event: threading.Event = field(default_factory=threading.Event)
     thread: Optional[threading.Thread] = None
@@ -116,6 +120,7 @@ class JobState:
     def update_progress(self, line: str):
         course_match = re.search(r'\[\s*(\d+)\s*/\s*(\d+)\s*\]\s+(.+)$', line)
         if course_match:
+            self.clear_wait_countdown()
             self.course_index = int(course_match.group(1))
             self.total_courses = int(course_match.group(2))
             self.current_course = course_match.group(3).strip()
@@ -128,41 +133,54 @@ class JobState:
 
         chapter_match = re.search(r'第\s*(\d+)\s*/\s*(\d+)\s*章:\s*(.+?)(?:\s*\((\d+)%\))?$', line)
         if chapter_match:
+            self.clear_wait_countdown()
             self.chapter_index = int(chapter_match.group(1))
             self.total_chapters = int(chapter_match.group(2))
             self.current_chapter = chapter_match.group(3).strip()
             if chapter_match.group(4):
                 self.chapter_progress = int(chapter_match.group(4))
+                self.chapter_progress_updated_at = time.time()
             self.current_step = "观看视频"
             return
 
         chapter_done_match = re.search(r'章节完成:\s*(.+)$', line)
         if chapter_done_match:
+            self.clear_wait_countdown()
             self.current_chapter = chapter_done_match.group(1).strip()
             self.chapter_progress = 100
+            self.chapter_progress_updated_at = time.time()
             self.current_step = "完成当前章节"
 
         total_match = re.search(r'找到\s+(\d+)\s+门未完成课程', line)
         if total_match:
+            self.clear_wait_countdown()
             self.total_courses = int(total_match.group(1))
             self.current_step = "准备学习"
             return
 
         if "开始学习视频" in line:
+            self.clear_wait_countdown()
             self.current_step = "观看视频"
         elif "收集考试题目" in line or "开始收集题目" in line:
+            self.clear_wait_countdown()
             self.current_step = "收集题库"
         elif "参加最终考试" in line or "开始最终考试" in line:
+            self.clear_wait_countdown()
             self.current_step = "自动答题"
         elif "课程学习完成" in line or "视频学习完成" in line:
+            self.clear_wait_countdown()
             self.current_step = "完成当前课程"
         elif "所有课程都已完成" in line:
+            self.clear_wait_countdown()
             self.current_step = "全部完成"
         elif "当前不在学习时间内" in line or "当前不在允许学习时间内" in line:
             self.current_step = "等待学习时间"
+            self.start_wait_countdown()
         elif "正在登录认证" in line:
+            self.clear_wait_countdown()
             self.current_step = "登录认证"
         elif "获取课程信息" in line or "正在扫描课程列表" in line:
+            self.clear_wait_countdown()
             self.current_step = "获取课程"
 
         remaining_match = re.search(r'还有\s+(\d+)\s+门课程需要处理', line)
@@ -171,11 +189,70 @@ class JobState:
             self.current_step = "任务未完成"
 
         if any(keyword in line for keyword in ("章节失败", "视频学习失败", "考试失败", "题目收集失败", "最终考试失败")):
+            self.clear_wait_countdown()
             self.business_failed = True
             self.current_step = "任务未完成"
 
-    def snapshot(self) -> Dict[str, Any]:
+    def seconds_until_next_window(self) -> int:
+        if not self.study_windows:
+            return 0
+        try:
+            module = load_auto_module()
+            return int(module.StudyTimeWindow(self.study_windows).seconds_until_next_window())
+        except Exception:
+            return 0
+
+    def start_wait_countdown(self):
+        remaining = self.seconds_until_next_window()
+        now = time.time()
+        if remaining <= 0:
+            self.clear_wait_countdown()
+            return
+        if not self.wait_until_at or abs(self.wait_until_at - (now + remaining)) > 5:
+            self.wait_started_at = now
+            self.wait_total_seconds = remaining
+            self.wait_until_at = now + remaining
+
+    def clear_wait_countdown(self):
+        self.wait_started_at = None
+        self.wait_total_seconds = 0
+        self.wait_until_at = None
+
+    def wait_snapshot(self) -> Dict[str, Any]:
+        running = self.process is not None and self.process.poll() is None
+        if self.current_step != "等待学习时间" or not running:
+            return {
+                "wait_remaining_seconds": 0,
+                "wait_total_seconds": 0,
+                "wait_progress_percent": 0,
+                "wait_until_at": None,
+            }
+
+        remaining = self.seconds_until_next_window()
+        if remaining <= 0:
+            return {
+                "wait_remaining_seconds": 0,
+                "wait_total_seconds": self.wait_total_seconds,
+                "wait_progress_percent": 100,
+                "wait_until_at": self.wait_until_at,
+            }
+
+        if self.wait_total_seconds <= 0 or remaining > self.wait_total_seconds:
+            self.wait_started_at = time.time()
+            self.wait_total_seconds = remaining
+            self.wait_until_at = self.wait_started_at + remaining
+
+        total = max(remaining, self.wait_total_seconds, 1)
+        progress = max(0, min(100, round((1 - remaining / total) * 100)))
         return {
+            "wait_remaining_seconds": remaining,
+            "wait_total_seconds": total,
+            "wait_progress_percent": progress,
+            "wait_until_at": self.wait_until_at,
+        }
+
+    def snapshot(self) -> Dict[str, Any]:
+        data = {
             "id": self.id,
             "action": self.action,
             "user_file": self.user_file,
@@ -191,6 +268,7 @@ class JobState:
             "chapter_index": self.chapter_index,
             "total_chapters": self.total_chapters,
             "chapter_progress": self.chapter_progress,
+            "chapter_progress_updated_at": self.chapter_progress_updated_at,
             "remaining_courses": self.remaining_courses,
             "study_windows": self.study_windows,
             "keep_schedule": self.keep_schedule,
@@ -199,6 +277,8 @@ class JobState:
             "logs": self.logs,
             "running": self.process is not None and self.process.poll() is None,
         }
+        data.update(self.wait_snapshot())
+        return data
 
 
 def strip_ansi(text: str) -> str:
@@ -407,10 +487,12 @@ def run_job(job: JobState, payload: JobRequest):
 
         return_code = process.wait()
         if job.stop_event.is_set():
+            job.clear_wait_countdown()
             job.status = "stopped"
             job.message = "任务已停止"
             job.current_step = "已停止"
         elif return_code == 0:
+            job.clear_wait_countdown()
             if job.business_failed or job.remaining_courses > 0:
                 job.status = "incomplete"
                 job.message = f"还有 {job.remaining_courses} 门课程需要处理" if job.remaining_courses > 0 else "任务未完成"
@@ -421,10 +503,12 @@ def run_job(job: JobState, payload: JobRequest):
                 if job.current_step != "全部完成":
                     job.current_step = "任务完成"
         else:
+            job.clear_wait_countdown()
             job.status = "failed"
             job.message = f"任务退出码: {return_code}"
             job.current_step = "任务失败"
     except Exception as exc:
+        job.clear_wait_countdown()
         job.status = "failed"
         job.message = str(exc)
         job.current_step = "任务失败"
@@ -539,6 +623,9 @@ def api_update_schedule(payload: UpdateScheduleRequest):
         if job:
             job.study_windows = payload.study_windows
             job.keep_schedule = payload.keep_schedule
+            if job.current_step == "等待学习时间":
+                job.clear_wait_countdown()
+                job.start_wait_countdown()
             job.log(f"学习时间窗设置为: {payload.study_windows or '全天'}")
             return job.snapshot()
         return {"user_file": payload.user_file, "study_windows": payload.study_windows, "keep_schedule": payload.keep_schedule}
