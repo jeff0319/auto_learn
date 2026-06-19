@@ -8,11 +8,11 @@
   <style>
     :root { color-scheme: light; --bg:#f6f7f9; --panel:#fff; --text:#20242a; --muted:#657080; --line:#dfe4ea; --brand:#1f7a65; --brand-soft:#e9f7f2; --danger:#b42318; --blue:#2563eb; --amber:#b7791f; }
     * { box-sizing: border-box; }
-    body { margin:0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background:var(--bg); color:var(--text); }
+    body { margin:0; overflow-x:hidden; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background:var(--bg); color:var(--text); }
     header { height:64px; display:flex; align-items:center; justify-content:space-between; padding:0 28px; border-bottom:1px solid var(--line); background:#fff; }
     h1 { font-size:20px; margin:0; letter-spacing:0; }
     main { max-width:1180px; margin:0 auto; padding:24px; display:grid; grid-template-columns: 380px 1fr; gap:20px; }
-    section { background:var(--panel); border:1px solid var(--line); border-radius:8px; padding:18px; }
+    section { min-width:0; background:var(--panel); border:1px solid var(--line); border-radius:8px; padding:18px; }
     h2 { font-size:15px; margin:0 0 14px; }
     label { display:block; font-size:13px; color:var(--muted); margin:12px 0 6px; }
     select, input { width:100%; min-height:38px; border:1px solid var(--line); border-radius:6px; padding:8px 10px; font-size:14px; background:#fff; }
@@ -24,7 +24,7 @@
     button.danger { background:var(--danger); }
     button:disabled { opacity:.55; cursor:not-allowed; }
     .actions { display:flex; gap:10px; margin-top:16px; flex-wrap:wrap; }
-    .status { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:12px; }
+    .status { min-width:0; display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:12px; }
     .pill { border:1px solid var(--line); border-radius:999px; padding:4px 10px; font-size:12px; color:var(--muted); background:#fafafa; }
     .state-pill { font-weight:600; transition:background-color .2s ease, border-color .2s ease, color .2s ease, box-shadow .2s ease; }
     .state-pill.running { color:#17614f; border-color:#b9dfd2; background:#eef8f4; }
@@ -36,27 +36,32 @@
     .job-list { display:grid; gap:8px; margin-bottom:12px; }
     .student-name { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-weight:650; color:var(--text); }
     .job-meta { color:var(--muted); font-size:12px; margin-top:2px; }
-    .detail { position:relative; display:grid; grid-template-columns:90px 1fr; gap:8px; border:1px solid var(--line); border-radius:6px; padding:12px; margin-bottom:12px; background:#fff; font-size:13px; }
-    .detail.has-pulse { padding-right:70px; }
+    .detail { position:relative; min-width:0; display:grid; grid-template-columns:90px minmax(0, 1fr); gap:8px; border:1px solid var(--line); border-radius:6px; padding:12px; margin-bottom:12px; background:#fff; font-size:13px; }
+    .detail.running { border-color:#b9dfd2; background:#f3fbf8; }
+    .detail.success { border-color:#b9dfd2; background:#f3fbf8; }
+    .detail.failed { border-color:#f0b8b2; background:#fff6f5; }
+    .detail.incomplete { border-color:#f1d39b; background:#fffaf0; }
+    .detail.stopped, .detail.idle { background:#fafafa; }
+    .detail.has-pulse { padding-right:82px; }
     .detail span:nth-child(odd) { color:var(--muted); }
     .detail span:nth-child(even) { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-    .status-pulse { position:absolute; top:10px; right:12px; width:36px; height:36px; border-radius:50%; background:conic-gradient(var(--brand) var(--pulse-deg), #dfe9e6 0deg); box-shadow:0 0 0 1px rgba(31,122,101,.12); display:grid; place-items:center; }
-    .status-pulse::before { content:""; position:absolute; inset:-2px; border-radius:inherit; border:1px solid rgba(31,122,101,.18); }
-    .status-pulse::after { content:""; position:absolute; inset:4px; border-radius:inherit; background:#fff; box-shadow:inset 0 0 0 1px rgba(31,122,101,.08); }
+    .status-pulse { position:absolute; top:8px; right:12px; width:44px; height:44px; border-radius:50%; background:conic-gradient(from -90deg, var(--brand) var(--pulse-deg), #dfe9e6 0deg); display:grid; place-items:center; }
+    .status-pulse::after { content:""; position:absolute; inset:5px; border-radius:inherit; background:#fff; }
     .pulse-inner { position:relative; z-index:1; display:grid; justify-items:center; color:#174f43; font-variant-numeric:tabular-nums; }
     .pulse-value { font-size:11px; font-weight:700; line-height:1; }
     .progress-rings { position:relative; width:32px; height:32px; display:grid; place-items:center; flex:0 0 auto; color:#174f43; }
     .progress-rings svg { width:100%; height:100%; overflow:visible; }
-    .progress-rings circle { fill:none; vector-effect:non-scaling-stroke; }
-    .progress-rings path { fill:none; stroke-linecap:round; vector-effect:non-scaling-stroke; }
-    .progress-rings .ring-track-outer { stroke:#d7e8e2; stroke-width:4.2; }
-    .progress-rings .ring-track-inner { stroke:#d7e9f7; stroke-width:4.2; }
-    .progress-rings .ring-track-wait { stroke:#f2e6cf; stroke-width:3.2; }
-    .progress-rings .ring-course { stroke:#1f7a65; stroke-width:4.2; transition:stroke-dashoffset .45s ease; }
-    .progress-rings .ring-chapter { stroke:#2f83cc; stroke-width:4.2; transition:stroke-dashoffset .45s ease; }
-    .progress-rings .ring-wait { stroke:#c58a2b; stroke-width:3.2; transition:stroke-dashoffset .45s ease; }
+    .progress-rings circle { fill:none; }
+    .progress-rings path { fill:none; stroke-linecap:round; }
+    .progress-rings .ring-track-outer { stroke:#d7e8e2; stroke-width:4.45; }
+    .progress-rings .ring-track-inner { stroke:#d7e9f7; stroke-width:4.45; }
+    .progress-rings .ring-track-wait { stroke:#f2e6cf; stroke-width:3.45; }
+    .progress-rings .ring-course { stroke:#1f7a65; stroke-width:4.45; transition:stroke-dashoffset .45s ease; }
+    .progress-rings .ring-chapter { stroke:#2f83cc; stroke-width:4.45; transition:stroke-dashoffset .45s ease; }
+    .progress-rings .ring-wait { stroke:#c58a2b; stroke-width:3.45; transition:stroke-dashoffset .45s ease; }
     .progress-rings .ring-label { display:none; position:absolute; inset:0; place-items:center; font-size:11px; font-weight:700; font-variant-numeric:tabular-nums; }
-    .progress-rings.detail-ring { position:absolute; top:8px; right:12px; width:46px; height:46px; border-radius:50%; background:#fff; box-shadow:0 0 0 1px rgba(31,122,101,.08), 0 6px 14px rgba(32,36,42,.06); }
+    .progress-rings.detail-ring { position:absolute; top:8px; right:12px; width:60px; height:60px; border-radius:50%; background:transparent; box-shadow:none; overflow:visible; }
+    .progress-rings.detail-ring svg { position:relative; z-index:1; }
     .student-panel { margin-bottom:16px; }
     .student-panel summary { min-height:38px; display:flex; align-items:center; justify-content:space-between; gap:12px; cursor:pointer; list-style:none; }
     .student-panel summary::-webkit-details-marker { display:none; }
@@ -64,6 +69,10 @@
     .student-panel summary::after { content:""; width:8px; height:8px; border-right:1.5px solid var(--muted); border-bottom:1.5px solid var(--muted); transform:rotate(45deg); transition:transform .18s ease; margin-right:4px; }
     .student-panel[open] summary::after { transform:rotate(225deg); }
     .student-panel .pill { margin-left:auto; }
+    .student-filters { display:flex; gap:6px; flex-wrap:wrap; margin:8px 0 10px; }
+    .filter-button { min-height:30px; padding:5px 9px; border-color:var(--line); border-radius:999px; background:#fff; color:var(--muted); font-size:12px; line-height:1.2; }
+    .filter-button:hover { border-color:#bfd7ce; color:#17614f; background:#f7fbf9; }
+    .filter-button.active { border-color:#9ccbbb; color:#17614f; background:#eaf6f2; font-weight:650; }
     .student-table-wrap { max-height:320px; overflow:auto; border:1px solid var(--line); border-radius:6px; background:#fff; margin-top:8px; }
     .student-table { width:100%; border-collapse:collapse; table-layout:fixed; font-size:13px; }
     .student-table th { position:sticky; top:0; z-index:1; background:#f8fafb; color:var(--muted); font-size:12px; font-weight:650; text-align:left; padding:7px 8px; border-bottom:1px solid var(--line); }
@@ -71,7 +80,10 @@
     .student-table tr:last-child td { border-bottom:0; }
     .student-table tbody tr { cursor:pointer; }
     .student-table tbody tr:hover { background:#f7fbf9; }
-    .student-table tbody tr.active { background:#eef8f4; }
+    .student-table tbody tr.active { background:transparent; }
+    .student-table tbody tr.active:hover { background:#f7fbf9; }
+    .student-table tbody tr.active td:first-child { position:relative; }
+    .student-table tbody tr.active td:first-child::before { content:""; position:absolute; left:0; top:7px; bottom:7px; width:3px; border-radius:0 999px 999px 0; background:var(--brand); }
     .student-table tbody tr.failed td, .student-table tbody tr.incomplete td { background:#fffaf0; }
     .student-table tbody tr.success, .student-table tbody tr.stopped, .student-table tbody tr.idle { opacity:.78; }
     .student-table .student-name { display:block; }
@@ -81,10 +93,12 @@
     .student-table .stage-text { display:block; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--muted); }
     .student-table .state-pill { white-space:nowrap; }
     .student-table .progress-rings { margin-left:auto; margin-right:auto; }
+    .add-student-module { margin-top:22px; padding-top:18px; border-top:1px solid var(--line); }
+    .add-student-module h2 { margin-bottom:12px; }
     .feedback { min-height:20px; margin-top:8px; font-size:12px; line-height:1.5; color:var(--muted); }
     .feedback.success { color:var(--brand); }
     .feedback.error { color:var(--danger); }
-    pre { height:620px; margin:0; overflow:auto; background:#101418; color:#d7e0ea; border-radius:6px; padding:14px; font:12px/1.55 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; white-space:pre-wrap; }
+    pre { max-width:100%; height:620px; margin:0; overflow:auto; background:#101418; color:#d7e0ea; border-radius:6px; padding:14px; font:12px/1.55 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; white-space:pre-wrap; overflow-wrap:anywhere; }
     .hint { font-size:12px; line-height:1.5; color:var(--muted); margin-top:8px; }
     details.auth-help { border:1px solid var(--line); border-radius:6px; padding:10px 12px; margin:8px 0 10px; background:#fafafa; overflow:hidden; }
     details.auth-help summary { cursor:pointer; font-size:13px; color:var(--text); }
@@ -92,7 +106,7 @@
     details.auth-help li { min-width:0; overflow-wrap:anywhere; }
     details.auth-help code { color:var(--text); white-space:normal; overflow-wrap:anywhere; word-break:break-word; }
     @keyframes statusFlow { from { background-position:0% 0; } to { background-position:200% 0; } }
-    @media (max-width: 900px) { main { grid-template-columns:1fr; padding:14px; } header { padding:0 16px; } pre { height:420px; } }
+    @media (max-width: 900px) { main { grid-template-columns:minmax(0, 1fr); padding:14px; } header { padding:0 16px; } .detail { grid-template-columns:70px minmax(0, 1fr); } .detail.has-pulse { padding-right:78px; } pre { height:420px; } }
   </style>
 </head>
 <body>
@@ -102,13 +116,13 @@
   </header>
   <main>
     <section>
-      <h2>任务设置</h2>
       <select id="user" hidden></select>
       <details class="student-panel" open>
         <summary>
           <h2>学员列表</h2>
           <span class="pill" id="boardCount"></span>
         </summary>
+        <div class="student-filters" id="studentFilters"></div>
         <div class="student-table-wrap" id="studentTableWrap">
           <table class="student-table">
             <thead>
@@ -163,22 +177,24 @@
         <button class="secondary" id="refreshUsers">刷新用户</button>
       </div>
 
-      <h2 style="margin-top:24px;">添加学员</h2>
-      <details class="auth-help">
-        <summary>如何获取 authCode</summary>
-        <ol>
-          <li>先进入 <code>https://rsj.nanjing.gov.cn/</code></li>
-          <li>点击右上角的“用户登陆”，登陆后跳转到 <code>https://m.mynj.cn:11097/plateform/rediectIndex/goods?authCode=XXXXXXX</code></li>
-          <li>复制 <code>authCode=</code> 后面所有的字符 <code>XXXXXXX</code></li>
-          <li>在下面粘贴第 3 步复制下来的 <code>XXXXXXX</code></li>
-        </ol>
-      </details>
-      <label>authCode</label>
-      <input id="authCode" placeholder="粘贴登录跳转地址里的 authCode">
-      <div class="actions">
-        <button class="secondary" id="createUser">保存学员</button>
+      <div class="add-student-module">
+        <h2>添加学员</h2>
+        <details class="auth-help">
+          <summary>如何获取 authCode</summary>
+          <ol>
+            <li>先进入 <code>https://rsj.nanjing.gov.cn/</code></li>
+            <li>点击右上角的“用户登陆”，登陆后跳转到 <code>https://m.mynj.cn:11097/plateform/rediectIndex/goods?authCode=XXXXXXX</code></li>
+            <li>复制 <code>authCode=</code> 后面所有的字符 <code>XXXXXXX</code></li>
+            <li>在下面粘贴第 3 步复制下来的 <code>XXXXXXX</code></li>
+          </ol>
+        </details>
+        <label>authCode</label>
+        <input id="authCode" placeholder="粘贴登录跳转地址里的 authCode">
+        <div class="actions">
+          <button class="secondary" id="createUser">保存学员</button>
+        </div>
+        <div class="feedback" id="createUserStatus"></div>
       </div>
-      <div class="feedback" id="createUserStatus"></div>
     </section>
     <section>
       <div class="status">
@@ -194,6 +210,7 @@ const $ = (id) => document.getElementById(id);
 const nowYear = new Date().getFullYear();
 let latestJobs = [];
 let selectedUserFile = "";
+let studentFilter = "all";
 let usersByFile = {};
 let videoTickAnchors = {};
 $("year").value = nowYear;
@@ -273,6 +290,47 @@ function studentPriority(row) {
   return 4;
 }
 
+function studentFilterKey(row) {
+  const job = row.job;
+  if (job?.running) return "running";
+  if (job?.status === "failed" || job?.status === "incomplete") return "attention";
+  if (job?.status === "stopping") return "stopping";
+  if (job?.status === "success" || job?.status === "stopped") return "done";
+  return "idle";
+}
+
+const studentFilterLabels = {
+  all: "全部",
+  running: "运行中",
+  done: "已结束",
+  idle: "暂无"
+};
+
+function filteredStudentRows(rows) {
+  if (studentFilter === "all") return rows;
+  return rows.filter(row => studentFilterKey(row) === studentFilter);
+}
+
+function renderStudentFilters(rows) {
+  const counts = rows.reduce((acc, row) => {
+    const key = studentFilterKey(row);
+    acc[key] = (acc[key] || 0) + 1;
+    return acc;
+  }, {all: rows.length});
+  const filters = ["all", "running", "done", "idle"];
+  $("studentFilters").innerHTML = filters.map(key => `
+    <button type="button" class="filter-button ${studentFilter === key ? "active" : ""}" data-filter="${key}">
+      ${studentFilterLabels[key]} ${counts[key] || 0}
+    </button>
+  `).join("");
+  $("studentFilters").querySelectorAll("button[data-filter]").forEach(button => {
+    button.onclick = () => {
+      studentFilter = button.dataset.filter;
+      renderJobs();
+    };
+  });
+}
+
 function applySelectedSchedule() {
   if (document.activeElement === $("windows")) return;
   if (!selectedUserFile) {
@@ -316,6 +374,11 @@ function jobStateClass(job) {
 function jobStateText(job) {
   if (!job) return "暂无任务";
   return job.running ? "运行中" : (job.status || "-");
+}
+
+function setDetailState(job, hasIndicator) {
+  const detail = $("jobDetail");
+  detail.className = `detail ${hasIndicator ? "has-pulse" : ""} ${jobStateClass(job) || (!job ? "idle" : "")}`.trim();
 }
 
 function progressText(job) {
@@ -370,14 +433,14 @@ function dualRingHtml(job, className = "") {
   const tick = videoTickRemaining(job);
   const waitPercent = clampPercent((1 - tick / 30) * 100);
   const title = `课程 ${Math.round(coursePercent)}%，章节 ${Math.round(chapterPercent)}%，下次检查 ${tick}s`;
-  const outerRadius = 12.2;
-  const innerRadius = 7.4;
-  const waitRadius = 3.4;
+  const outerRadius = 12.4;
+  const innerRadius = 7.25;
+  const waitRadius = 2.9;
   const coursePath = ringArcPath(16, 16, outerRadius, coursePercent);
   const chapterPath = ringArcPath(16, 16, innerRadius, chapterPercent);
   const waitPath = ringArcPath(16, 16, waitRadius, waitPercent);
   return `
-    <div class="progress-rings ${className}" title="${escapeHtml(title)}">
+    <div class="progress-rings ${className}" data-user-file="${escapeHtml(job.user_file)}" title="${escapeHtml(title)}">
       <svg viewBox="0 0 32 32" aria-hidden="true">
         <circle class="ring-track-outer" cx="16" cy="16" r="${outerRadius}"></circle>
         ${coursePath ? `<path class="ring-course" d="${coursePath}"></path>` : ""}
@@ -430,7 +493,7 @@ function statusPulseState(job) {
     const total = Math.max(waitingSeconds, Number(job.wait_total_seconds || 0), 1);
     return {
       value: formatPulseDuration(waitingSeconds),
-      degree: Math.round((waitingSeconds / total) * 360),
+      degree: Math.round((1 - waitingSeconds / total) * 360),
       title: formatDuration(waitingSeconds)
     };
   }
@@ -471,6 +534,16 @@ function updateStatusPulse(job) {
   if (value) value.textContent = state.value;
 }
 
+function updateLiveIndicators() {
+  document.querySelectorAll(".progress-rings[data-user-file]").forEach(ring => {
+    const job = latestJobs.find(item => item.user_file === ring.dataset.userFile);
+    if (!job) return;
+    const next = dualRingHtml(job, ring.classList.contains("detail-ring") ? "detail-ring" : "");
+    if (next) ring.outerHTML = next;
+  });
+  updateStatusPulse(selectedJob());
+}
+
 function studentBoardRowHtml(row) {
   const rowClass = row.job ? jobStateClass(row.job) : "idle";
   return `
@@ -493,8 +566,13 @@ function rowStageText(row) {
 }
 
 function renderStudentBoard(rows) {
-  $("jobList").innerHTML = rows.map(row => studentBoardRowHtml(row)).join("");
-  if (!rows.length) $("jobList").innerHTML = `<tr><td colspan="4" class="hint">暂无学员。不同学员可以同时运行，同一学员只能运行一个任务。</td></tr>`;
+  const visibleRows = filteredStudentRows(rows);
+  $("jobList").innerHTML = visibleRows.map(row => studentBoardRowHtml(row)).join("");
+  if (!rows.length) {
+    $("jobList").innerHTML = `<tr><td colspan="4" class="hint">暂无学员。不同学员可以同时运行，同一学员只能运行一个任务。</td></tr>`;
+  } else if (!visibleRows.length) {
+    $("jobList").innerHTML = `<tr><td colspan="4" class="hint">当前筛选下暂无学员。</td></tr>`;
+  }
   $("jobList").querySelectorAll("tr[data-user-file]").forEach(item => {
     item.onclick = () => {
       selectedUserFile = item.dataset.userFile;
@@ -507,12 +585,16 @@ function renderStudentBoard(rows) {
 
 function renderJobs() {
   const rows = studentRows();
+  const visibleRows = filteredStudentRows(rows);
   const selectedRow = selectedUserFile ? rows.find(row => row.user_file === selectedUserFile) || null : null;
   const job = selectedRow?.job || null;
   const formJob = selectedUserFile ? latestJobs.find(item => item.user_file === selectedUserFile) || null : null;
   const formRunning = Boolean(formJob && formJob.running);
   const runningCount = latestJobs.filter(item => item.running).length;
-  $("boardCount").textContent = runningCount > 0 ? `${runningCount}/${rows.length} 运行中` : `${rows.length} 名学员 · 全部`;
+  renderStudentFilters(rows);
+  $("boardCount").textContent = studentFilter === "all"
+    ? (runningCount > 0 ? `${runningCount}/${rows.length} 运行中` : `${rows.length} 名学员`)
+    : `${visibleRows.length}/${rows.length} ${studentFilterLabels[studentFilter]}`;
   renderStudentBoard(rows);
   $("logs").textContent = job ? job.logs.join("\n") : "";
   $("logs").scrollTop = $("logs").scrollHeight;
@@ -523,7 +605,7 @@ function renderJobs() {
   if (!selectedRow) {
     $("state").textContent = "请选择学员";
     $("state").className = "pill";
-    $("jobDetail").classList.remove("has-pulse");
+    setDetailState(null, false);
     $("jobDetail").innerHTML = `
       <span>学员</span><span>未选择</span>
       <span>阶段</span><span>从左侧学员列表点击一个名字查看详情</span>
@@ -538,7 +620,7 @@ function renderJobs() {
   $("state").textContent = job ? `${job.username || job.user_file} · ${job.current_step || job.status}`.trim() : `${selectedName} · 暂无任务`;
   $("state").className = `pill state-pill ${jobStateClass(job)}`;
   const detailIndicatorHtml = dualRingHtml(job, "detail-ring") || statusPulseHtml(job);
-  $("jobDetail").classList.toggle("has-pulse", Boolean(detailIndicatorHtml));
+  setDetailState(job, Boolean(detailIndicatorHtml));
   $("jobDetail").innerHTML = job ? `
     <span>学员</span><span>${escapeHtml(job.username || job.user_file)}</span>
     <span>任务</span><span>${escapeHtml(taskModeText(job))}</span>
@@ -640,7 +722,7 @@ $("createUser").onclick = async () => {
 setInterval(() => {
   const runningCount = latestJobs.filter(item => item.running).length;
   $("clock").textContent = runningCount > 0 ? `${new Date().toLocaleString()} · ${runningCount} 个任务运行中` : new Date().toLocaleString();
-  renderJobs();
+  updateLiveIndicators();
 }, 1000);
 setInterval(pollState, 2500);
 loadUsers();
