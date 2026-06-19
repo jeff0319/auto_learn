@@ -397,8 +397,16 @@ class StudyTimeWindow:
             raise StudyWindowClosed(f"当前不在允许学习时间内，允许时间：{self.describe()}")
 
     def seconds_until_next_window(self, now: Optional[datetime.datetime] = None) -> int:
-        if not self.windows or self.is_allowed(now):
+        start_dt = self.next_window_start(now)
+        if not start_dt:
             return 0
+
+        current = now or datetime.datetime.now()
+        return max(1, math.ceil((start_dt - current).total_seconds()))
+
+    def next_window_start(self, now: Optional[datetime.datetime] = None) -> Optional[datetime.datetime]:
+        if not self.windows or self.is_allowed(now):
+            return None
 
         current = now or datetime.datetime.now()
         candidates = []
@@ -408,7 +416,7 @@ class StudyTimeWindow:
                 start_dt += datetime.timedelta(days=1)
             candidates.append(start_dt)
 
-        return max(1, int((min(candidates) - current).total_seconds()))
+        return min(candidates)
 
     @staticmethod
     def _time_in_window(now_time: datetime.time, start: datetime.time, end: datetime.time) -> bool:

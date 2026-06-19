@@ -33,6 +33,7 @@
     .pill { border:1px solid var(--line); border-radius:999px; padding:4px 10px; font-size:12px; color:var(--muted); background:#fafafa; }
     .state-pill { font-weight:600; transition:background-color .2s ease, border-color .2s ease, color .2s ease, box-shadow .2s ease; }
     .state-pill.running { color:#17614f; border-color:#b9dfd2; background:#eef8f4; }
+    .state-pill.waiting { color:#7c5a16; border-color:#e8cf96; background:#fff8e8; }
     .state-pill.stopping { color:#8a5a12; border-color:#f1d39b; background:linear-gradient(90deg, #fff8e8 0%, #fff 50%, #fff8e8 100%); background-size:200% 100%; animation:statusFlow 1.8s linear infinite; }
     .state-pill.success { color:#17614f; border-color:#b9dfd2; background:#eef8f4; }
     .state-pill.failed { color:var(--danger); border-color:#f0b8b2; background:#fff1f0; }
@@ -43,6 +44,7 @@
     .job-meta { color:var(--muted); font-size:12px; margin-top:2px; }
     .detail { position:relative; min-width:0; display:grid; grid-template-columns:64px minmax(0, 1fr); column-gap:6px; row-gap:7px; border:1px solid var(--line); border-radius:6px; padding:12px; margin-bottom:12px; background:#fff; font-size:13px; line-height:1.45; }
     .detail.running { border-color:#b9dfd2; background:#f3fbf8; }
+    .detail.running.waiting { border-color:#e8cf96; background:#fffaf0; }
     .detail.success { border-color:#b9dfd2; background:#f3fbf8; }
     .detail.failed { border-color:#f0b8b2; background:#fff6f5; }
     .detail.incomplete { border-color:#f1d39b; background:#fffaf0; }
@@ -50,9 +52,15 @@
     .detail.has-pulse { padding-right:82px; }
     .detail > span:nth-child(odd) { color:var(--muted); white-space:nowrap; }
     .detail > span:nth-child(even) { min-width:0; overflow:visible; white-space:normal; overflow-wrap:anywhere; word-break:break-word; }
-    .status-pulse { position:absolute; top:8px; right:12px; width:44px; height:44px; border-radius:50%; background:conic-gradient(from -90deg, var(--brand) var(--pulse-deg), #dfe9e6 0deg); display:grid; place-items:center; }
-    .status-pulse::after { content:""; position:absolute; inset:5px; border-radius:inherit; background:#fff; }
-    .pulse-inner { position:relative; z-index:1; display:grid; justify-items:center; color:#174f43; font-variant-numeric:tabular-nums; }
+    .status-pulse { position:absolute; top:8px; right:12px; width:44px; height:44px; border-radius:50%; background:conic-gradient(from 0deg, var(--brand) var(--pulse-deg), #dfe9e6 0deg); display:grid; place-items:center; }
+    .status-pulse::after { content:""; position:absolute; inset:5px; z-index:0; border-radius:inherit; background:#fff; }
+    .status-pulse::before { content:""; position:absolute; inset:10px; z-index:1; border-radius:inherit; background:conic-gradient(from 0deg, rgba(197,138,43,.95) var(--activity-deg, 0deg), transparent 0deg); opacity:0; -webkit-mask:radial-gradient(farthest-side, transparent calc(100% - 2px), #000 calc(100% - 2px)); mask:radial-gradient(farthest-side, transparent calc(100% - 2px), #000 calc(100% - 2px)); }
+    .status-pulse.waiting::before { opacity:1; }
+    .status-pulse.inline-pulse { position:relative; top:auto; right:auto; width:32px; height:32px; margin-left:auto; margin-right:auto; }
+    .status-pulse.inline-pulse::after { inset:4px; }
+    .status-pulse.inline-pulse::before { inset:8px; }
+    .status-pulse.inline-pulse .pulse-value { font-size:9px; }
+    .pulse-inner { position:relative; z-index:2; display:grid; justify-items:center; color:#174f43; font-variant-numeric:tabular-nums; }
     .pulse-value { font-size:11px; font-weight:700; line-height:1; }
     .progress-rings { position:relative; width:32px; height:32px; display:grid; place-items:center; flex:0 0 auto; color:#174f43; }
     .progress-rings svg { width:100%; height:100%; overflow:visible; }
@@ -67,6 +75,12 @@
     .progress-rings .ring-label { display:none; position:absolute; inset:0; place-items:center; font-size:11px; font-weight:700; font-variant-numeric:tabular-nums; }
     .progress-rings.detail-ring { position:absolute; top:8px; right:12px; width:60px; height:60px; border-radius:50%; background:transparent; box-shadow:none; overflow:visible; }
     .progress-rings.detail-ring svg { position:relative; z-index:1; }
+    .progress-rings.waiting-ring .ring-track-outer { stroke:#e4eadf; }
+    .progress-rings.waiting-ring .ring-track-inner { stroke:#e6edf4; }
+    .progress-rings.waiting-ring .ring-track-wait { stroke:#f1e5cf; }
+    .progress-rings.waiting-ring .ring-course { stroke:#78a653; }
+    .progress-rings.waiting-ring .ring-chapter { stroke:#3b8db7; }
+    .progress-rings.waiting-ring .ring-wait { stroke:#c58a2b; }
     .student-panel { margin-bottom:16px; }
     .student-panel summary { min-height:38px; display:flex; align-items:center; justify-content:space-between; gap:12px; cursor:pointer; list-style:none; }
     .student-panel summary::-webkit-details-marker { display:none; }
@@ -354,8 +368,8 @@ function renderStudentFilters(rows) {
   });
 }
 
-function applySelectedSchedule() {
-  if (document.activeElement === $("windows")) return;
+function applySelectedSchedule(force = false) {
+  if (!force && document.activeElement === $("windows")) return;
   if (!selectedUserFile) {
     $("windows").value = "";
     $("keepSchedule").checked = true;
@@ -384,7 +398,7 @@ function taskModeText(job) {
 
 function jobStateClass(job) {
   if (!job) return "";
-  if (job.running) return "running";
+  if (job.running) return job.current_step === "等待学习时间" ? "running waiting" : "running";
   return {
     success: "success",
     failed: "failed",
@@ -397,6 +411,22 @@ function jobStateClass(job) {
 function jobStateText(job) {
   if (!job) return "暂无任务";
   return job.running ? "运行中" : (job.status || "-");
+}
+
+function jobStageText(job) {
+  if (!job) return "-";
+  if (job.running && job.current_step === "等待学习时间") {
+    return waitUntilText(job);
+  }
+  return job.current_step || job.message || job.status || "-";
+}
+
+function compactJobStageText(job) {
+  if (!job) return "-";
+  if (job.running && job.current_step === "等待学习时间") {
+    return waitUntilText(job);
+  }
+  return jobStageText(job);
 }
 
 function setDetailState(job, hasIndicator) {
@@ -477,10 +507,104 @@ function dualRingHtml(job, className = "") {
   `;
 }
 
+function waitRingHtml(job, className = "") {
+  const remaining = waitRemainingSeconds(job);
+  if (!job || !job.running || job.current_step !== "等待学习时间" || remaining <= 0) return "";
+  const hours = Math.floor(remaining / 3600) % 12;
+  const minutes = Math.floor((remaining % 3600) / 60);
+  const seconds = remaining % 60;
+  const hourClockRatio = (hours + minutes / 60 + seconds / 3600) / 12;
+  const minuteClockRatio = (minutes + seconds / 60) / 60;
+  const secondClockRatio = seconds / 60;
+  const hourPercent = clampPercent((1 - hourClockRatio) * 100);
+  const minutePercent = clampPercent((1 - minuteClockRatio) * 100);
+  const secondPercent = clampPercent((1 - secondClockRatio) * 100);
+  const title = `等待 ${formatDuration(remaining)} 后开始，时 ${Math.round(hourPercent)}%，分 ${Math.round(minutePercent)}%，秒 ${Math.round(secondPercent)}%`;
+  const outerRadius = 12.4;
+  const innerRadius = 7.25;
+  const waitRadius = 2.9;
+  const hourPath = ringArcPath(16, 16, outerRadius, hourPercent);
+  const minutePath = ringArcPath(16, 16, innerRadius, minutePercent);
+  const secondPath = ringArcPath(16, 16, waitRadius, secondPercent);
+  return `
+    <div class="progress-rings waiting-ring ${className}" data-user-file="${escapeHtml(job.user_file)}" title="${escapeHtml(title)}">
+      <svg viewBox="0 0 32 32" aria-hidden="true">
+        <circle class="ring-track-outer" cx="16" cy="16" r="${outerRadius}"></circle>
+        ${hourPath ? `<path class="ring-course" d="${hourPath}"></path>` : ""}
+        <circle class="ring-track-inner" cx="16" cy="16" r="${innerRadius}"></circle>
+        ${minutePath ? `<path class="ring-chapter" d="${minutePath}"></path>` : ""}
+        <circle class="ring-track-wait" cx="16" cy="16" r="${waitRadius}"></circle>
+        ${secondPath ? `<path class="ring-wait" d="${secondPath}"></path>` : ""}
+      </svg>
+    </div>
+  `;
+}
+
+function jobIndicatorHtml(job, className = "") {
+  return dualRingHtml(job, className) || waitRingHtml(job, className);
+}
+
 function waitRemainingSeconds(job) {
   if (!job || job.current_step !== "等待学习时间" || !job.running) return 0;
   if (job.wait_until_at) return Math.max(0, Math.ceil(job.wait_until_at - Date.now() / 1000));
   return Math.max(0, Number(job.wait_remaining_seconds || 0));
+}
+
+function waitUntilText(job) {
+  if (waitRemainingSeconds(job) <= 0) return "等待时间窗";
+  const windowStartText = nextStudyWindowStartText(job.study_windows);
+  if (windowStartText) return `${windowStartText} 开始`;
+  if (!job?.wait_until_at) return "等待时间窗";
+  return `${formatClockTime(Number(job.wait_until_at) * 1000)} 开始`;
+}
+
+function nextStudyWindowStartText(studyWindows) {
+  const windows = parseStudyWindows(studyWindows);
+  if (!windows.length) return "";
+  const now = new Date();
+  const nowSeconds = now.getHours() * 3600 + now.getMinutes() * 60 + now.getSeconds();
+  const starts = windows
+    .map(window => window.start)
+    .sort((a, b) => a.seconds - b.seconds);
+  const todayStart = starts.find(start => start.seconds > nowSeconds);
+  const start = todayStart || starts[0];
+  return `${start.hours}:${start.minutes}:${start.secondsText}`;
+}
+
+function parseStudyWindows(studyWindows) {
+  return String(studyWindows || "")
+    .split(/[,，\n]+/)
+    .map(item => item.trim())
+    .filter(Boolean)
+    .map(item => {
+      const [startText] = item.split("-");
+      const start = parseClockText(startText);
+      return start ? {start} : null;
+    })
+    .filter(Boolean);
+}
+
+function parseClockText(value) {
+  const match = String(value || "").trim().match(/^(\d{1,2}):(\d{1,2})(?::(\d{1,2}))?$/);
+  if (!match) return null;
+  const hoursNumber = Number(match[1]);
+  const minutesNumber = Number(match[2]);
+  const secondsNumber = Number(match[3] || 0);
+  if (hoursNumber > 23 || minutesNumber > 59 || secondsNumber > 59) return null;
+  return {
+    hours: String(hoursNumber),
+    minutes: String(minutesNumber).padStart(2, "0"),
+    secondsText: String(secondsNumber).padStart(2, "0"),
+    seconds: hoursNumber * 3600 + minutesNumber * 60 + secondsNumber
+  };
+}
+
+function formatClockTime(timestampMs) {
+  const date = new Date(timestampMs);
+  const hours = String(date.getHours());
+  const minutes = String(date.getMinutes()).padStart(2, "0");
+  const seconds = String(date.getSeconds()).padStart(2, "0");
+  return `${hours}:${minutes}:${seconds}`;
 }
 
 function formatDuration(totalSeconds) {
@@ -514,9 +638,14 @@ function statusPulseState(job) {
   const waitingSeconds = waitRemainingSeconds(job);
   if (job.current_step === "等待学习时间" && waitingSeconds > 0) {
     const total = Math.max(waitingSeconds, Number(job.wait_total_seconds || 0), 1);
+    const activityDegree = Math.round(((60 - (waitingSeconds % 60)) / 60) * 360);
     return {
       value: formatPulseDuration(waitingSeconds),
       degree: Math.round((1 - waitingSeconds / total) * 360),
+      percent: Math.round((1 - waitingSeconds / total) * 100),
+      activityDegree,
+      activityOffset: -Math.round(((60 - (waitingSeconds % 60)) / 60) * 100),
+      stateClass: "waiting",
       title: formatDuration(waitingSeconds)
     };
   }
@@ -533,12 +662,12 @@ function statusPulseState(job) {
   return null;
 }
 
-function statusPulseHtml(job) {
+function statusPulseHtml(job, className = "") {
   const state = statusPulseState(job);
   if (!state) return "";
   const degree = Math.max(0, Math.min(360, state.degree));
   return `
-    <div class="status-pulse" style="--pulse-deg:${degree}deg" title="${escapeHtml(state.title)}">
+    <div class="status-pulse ${className} ${state.stateClass || ""}" data-user-file="${escapeHtml(job.user_file)}" style="--pulse-deg:${degree}deg; --activity-deg:${state.activityDegree || 0}deg" title="${escapeHtml(state.title)}">
       <div class="pulse-inner">
         <div class="pulse-value">${escapeHtml(state.value)}</div>
       </div>
@@ -546,12 +675,13 @@ function statusPulseHtml(job) {
   `;
 }
 
-function updateStatusPulse(job) {
-  const pulse = $("jobDetail").querySelector(".status-pulse");
+function updateStatusPulseElement(pulse, job) {
   const state = statusPulseState(job);
   if (!pulse || !state) return;
   const degree = Math.max(0, Math.min(360, state.degree));
   pulse.style.setProperty("--pulse-deg", `${degree}deg`);
+  pulse.style.setProperty("--activity-deg", `${Math.max(0, Math.min(360, state.activityDegree || 0))}deg`);
+  pulse.classList.toggle("waiting", state.stateClass === "waiting");
   pulse.title = state.title;
   const value = pulse.querySelector(".pulse-value");
   if (value) value.textContent = state.value;
@@ -561,10 +691,13 @@ function updateLiveIndicators() {
   document.querySelectorAll(".progress-rings[data-user-file]").forEach(ring => {
     const job = latestJobs.find(item => item.user_file === ring.dataset.userFile);
     if (!job) return;
-    const next = dualRingHtml(job, ring.classList.contains("detail-ring") ? "detail-ring" : "");
+    const next = jobIndicatorHtml(job, ring.classList.contains("detail-ring") ? "detail-ring" : "");
     if (next) ring.outerHTML = next;
   });
-  updateStatusPulse(selectedJob());
+  document.querySelectorAll(".status-pulse[data-user-file]").forEach(pulse => {
+    const job = latestJobs.find(item => item.user_file === pulse.dataset.userFile);
+    updateStatusPulseElement(pulse, job);
+  });
 }
 
 function studentBoardRowHtml(row) {
@@ -574,7 +707,7 @@ function studentBoardRowHtml(row) {
       <td><span class="student-name">${escapeHtml(row.username || row.user_file)}</span></td>
       <td><span class="pill state-pill ${jobStateClass(row.job)}">${escapeHtml(jobStateText(row.job))}</span></td>
       <td><span class="stage-text">${escapeHtml(rowStageText(row))}</span></td>
-      <td>${dualRingHtml(row.job) || ""}</td>
+      <td>${jobIndicatorHtml(row.job) || ""}</td>
     </tr>
   `;
 }
@@ -582,7 +715,7 @@ function studentBoardRowHtml(row) {
 function rowStageText(row) {
   const job = row.job;
   if (!job) return "-";
-  if (job.running) return job.current_step || "运行中";
+  if (job.running) return compactJobStageText(job) || "运行中";
   if (job.status === "success") return "已完成";
   if (job.status === "stopped") return "已停止";
   return job.current_step || job.message || job.status || "-";
@@ -600,7 +733,7 @@ function renderStudentBoard(rows) {
     item.onclick = () => {
       selectedUserFile = item.dataset.userFile;
       $("user").value = selectedUserFile;
-      applySelectedSchedule();
+      applySelectedSchedule(true);
       renderJobs();
     };
   });
@@ -642,14 +775,14 @@ function renderJobs() {
   }
 
   const selectedName = selectedRow.username || selectedUserFile || "未选择";
-  $("state").textContent = job ? `${job.username || job.user_file} · ${job.current_step || job.status}`.trim() : `${selectedName} · 暂无任务`;
+  $("state").textContent = job ? `${job.username || job.user_file} · ${jobStageText(job)}`.trim() : `${selectedName} · 暂无任务`;
   $("state").className = `pill state-pill ${jobStateClass(job)}`;
-  const detailIndicatorHtml = dualRingHtml(job, "detail-ring") || statusPulseHtml(job);
+  const detailIndicatorHtml = jobIndicatorHtml(job, "detail-ring") || statusPulseHtml(job);
   setDetailState(job, Boolean(detailIndicatorHtml));
   $("jobDetail").innerHTML = job ? `
     <span>学员</span><span>${escapeHtml(job.username || job.user_file)}</span>
     <span>任务</span><span>${escapeHtml(taskModeText(job))}</span>
-    <span>阶段</span><span>${escapeHtml(job.current_step || job.message || job.status || "-")}</span>
+    <span>阶段</span><span>${escapeHtml(jobStageText(job))}</span>
     <span>课程</span><span title="${escapeHtml(job.current_course || "")}">${escapeHtml(progressText(job))} · ${escapeHtml(job.current_course || "尚未进入课程")}</span>
     <span>章节</span><span title="${escapeHtml(job.current_chapter || "")}">${escapeHtml(chapterProgressText(job))} · ${escapeHtml(job.current_chapter || "尚未进入章节")}</span>
     <span>时间窗</span><span>${escapeHtml(job.study_windows || "全天")}</span>
@@ -705,6 +838,7 @@ $("updateSchedule").onclick = async () => {
     });
     await loadUsers();
     await pollState();
+    applySelectedSchedule(true);
   } catch (err) { alert(err.message); }
 };
 $("refreshUsers").onclick = async () => {
@@ -713,7 +847,7 @@ $("refreshUsers").onclick = async () => {
 };
 $("user").onchange = () => {
   selectedUserFile = $("user").value;
-  applySelectedSchedule();
+  applySelectedSchedule(true);
   renderJobs();
 };
 $("action").onchange = updateActionFields;

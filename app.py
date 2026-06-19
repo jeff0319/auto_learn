@@ -202,16 +202,28 @@ class JobState:
         except Exception:
             return 0
 
+    def next_window_start_at(self) -> Optional[float]:
+        if not self.study_windows:
+            return None
+        try:
+            module = load_auto_module()
+            start_dt = module.StudyTimeWindow(self.study_windows).next_window_start()
+            return start_dt.timestamp() if start_dt else None
+        except Exception:
+            return None
+
     def start_wait_countdown(self):
         remaining = self.seconds_until_next_window()
-        now = time.time()
+        start_at = self.next_window_start_at()
         if remaining <= 0:
             self.clear_wait_countdown()
             return
-        if not self.wait_until_at or abs(self.wait_until_at - (now + remaining)) > 5:
+        now = time.time()
+        wait_until_at = start_at or now + remaining
+        if not self.wait_until_at or abs(self.wait_until_at - wait_until_at) > 0.5:
             self.wait_started_at = now
             self.wait_total_seconds = remaining
-            self.wait_until_at = now + remaining
+            self.wait_until_at = wait_until_at
 
     def clear_wait_countdown(self):
         self.wait_started_at = None
@@ -237,10 +249,18 @@ class JobState:
                 "wait_until_at": self.wait_until_at,
             }
 
-        if self.wait_total_seconds <= 0 or remaining > self.wait_total_seconds:
-            self.wait_started_at = time.time()
+        now = time.time()
+        start_at = self.next_window_start_at()
+        wait_until_at = start_at or now + remaining
+        if (
+            self.wait_total_seconds <= 0
+            or remaining > self.wait_total_seconds
+            or not self.wait_until_at
+            or abs(self.wait_until_at - wait_until_at) > 0.5
+        ):
+            self.wait_started_at = now
             self.wait_total_seconds = remaining
-            self.wait_until_at = self.wait_started_at + remaining
+            self.wait_until_at = wait_until_at
 
         total = max(remaining, self.wait_total_seconds, 1)
         progress = max(0, min(100, round((1 - remaining / total) * 100)))
