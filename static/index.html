@@ -801,9 +801,9 @@ function renderJobs() {
   const visibleRows = filteredStudentRows(rows);
   const selectedRow = selectedUserFile ? rows.find(row => row.user_file === selectedUserFile) || null : null;
   const job = selectedRow?.job || null;
-  const formJob = selectedUserFile ? latestJobs.find(item => item.user_file === selectedUserFile) || null : null;
+  const formJob = selectedRow?.job || null;
   const formRunning = Boolean(formJob && formJob.running);
-  const canActOnSelectedUser = hasSelectedUserConfig();
+  const canActOnSelectedUser = Boolean(selectedRow && usersByFile[selectedRow.user_file]);
   const runningCount = latestJobs.filter(item => item.running).length;
   renderStudentFilters(rows);
   $("boardCount").textContent = studentFilter === "all"
@@ -928,11 +928,11 @@ async function clearSelectedJobState(userFile = selectedUserFile) {
   }
 }
 
-$("start").onclick = startSelectedJob;
-$("stop").onclick = stopSelectedJob;
-$("clearState").onclick = clearSelectedJobState;
+$("start").onclick = () => startSelectedJob();
+$("stop").onclick = () => stopSelectedJob();
+$("clearState").onclick = () => clearSelectedJobState();
 $("updateSchedule").onclick = async () => {
-  if (!hasSelectedUserConfig()) return;
+  if (!selectedUserFile || !studentRows().some(row => row.user_file === selectedUserFile) || !usersByFile[selectedUserFile]) return;
   try {
     await requestJson("/api/jobs/schedule", {
       method: "POST",
