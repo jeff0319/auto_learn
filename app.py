@@ -336,6 +336,10 @@ class StopJobRequest(BaseModel):
     user_file: Optional[str] = None
 
 
+class ClearJobRequest(BaseModel):
+    user_file: str
+
+
 class UpdateScheduleRequest(BaseModel):
     user_file: str
     study_windows: str = ""
@@ -606,6 +610,8 @@ def api_state():
 
 @app.post("/api/jobs")
 def api_start_job(payload: JobRequest):
+    if not payload.user_file.strip():
+        raise HTTPException(status_code=400, detail="请选择学员")
     with job_lock:
         user_path = user_path_from_name(payload.user_file)
         username = payload.user_file
@@ -648,6 +654,22 @@ def api_stop_job(payload: StopJobRequest):
             job.log("收到停止请求")
             job.process.terminate()
         return {"jobs": [job.snapshot() for job in jobs.values()]}
+
+
+@app.post("/api/jobs/clear")
+def api_clear_job(payload: ClearJobRequest):
+    if not payload.user_file.strip():
+        raise HTTPException(status_code=400, detail="请选择学员")
+    user_path_from_name(payload.user_file)
+    with job_lock:
+        job = jobs.get(payload.user_file)
+        if not job:
+            return {"ok": True, "jobs": [job.snapshot() for job in jobs.values()]}
+        if job.process is not None and job.process.poll() is None:
+            job.stop_event.set()
+            job.process.terminate()
+        jobs.pop(payload.user_file, None)
+        return {"ok": True, "jobs": [job.snapshot() for job in jobs.values()]}
 
 
 @app.post("/api/jobs/schedule")

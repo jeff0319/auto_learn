@@ -20,13 +20,15 @@
     .row { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
     .check { display:flex; gap:8px; align-items:center; margin-top:12px; color:var(--text); font-size:14px; }
     button { border:1px solid transparent; border-radius:6px; padding:9px 12px; font-size:14px; cursor:pointer; background:var(--brand); color:#fff; transition:background-color .16s ease, border-color .16s ease, color .16s ease, box-shadow .16s ease, transform .12s ease; }
-    button:not(.secondary):not(.danger):not(.filter-button):hover:not(:disabled) { background:#17614f; color:#fff; box-shadow:0 2px 8px rgba(31,122,101,.18); transform:translateY(-1px); }
+    button:not(.secondary):not(.danger):not(.filter-button):not(.reset):hover:not(:disabled) { background:#17614f; color:#fff; box-shadow:0 2px 8px rgba(31,122,101,.18); transform:translateY(-1px); }
     button:active:not(:disabled) { transform:translateY(0); box-shadow:0 1px 4px rgba(31,122,101,.16); }
     button:focus-visible { outline:none; box-shadow:0 0 0 3px rgba(31,122,101,.18); }
     button.secondary { background:#fff; color:var(--text); border-color:var(--line); }
     button.secondary:hover:not(:disabled) { background:#f7fbf9; color:var(--text); border-color:#b9dfd2; box-shadow:0 2px 8px rgba(32,36,42,.06); transform:translateY(-1px); }
     button.danger { background:var(--danger); }
     button.danger:hover:not(:disabled) { background:#941b13; color:#fff; box-shadow:0 2px 8px rgba(180,35,24,.18); transform:translateY(-1px); }
+    button.reset { background:#4f5f7a; color:#fff; border-color:#4f5f7a; }
+    button.reset:hover:not(:disabled) { background:#3f4d64; color:#fff; border-color:#3f4d64; box-shadow:0 2px 8px rgba(79,95,122,.18); transform:translateY(-1px); }
     button:disabled { opacity:.55; cursor:not-allowed; }
     .actions { display:flex; gap:10px; margin-top:16px; flex-wrap:wrap; }
     .status { min-width:0; display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:12px; }
@@ -105,15 +107,20 @@
     .student-table tbody tr.active td:first-child::before { content:""; position:absolute; left:0; top:7px; bottom:7px; width:3px; border-radius:0 999px 999px 0; background:var(--brand); }
     .student-table tbody tr.failed td, .student-table tbody tr.incomplete td { background:#fffaf0; }
     .student-table tbody tr.success, .student-table tbody tr.stopped, .student-table tbody tr.idle { opacity:.78; }
-    .student-table .student-name { display:block; }
+    .student-table .student-name { display:block; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
     .student-table .name-col { width:74px; }
     .student-table .status-col { width:92px; }
     .student-table .stage-col { width:auto; }
+    .student-table .action-col { width:16px; text-align:center; }
     .student-table .progress-col { width:56px; text-align:center; }
     .student-table .stage-text { display:block; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--muted); }
     .student-table .state-pill { white-space:nowrap; }
     .student-table td:last-child { text-align:center; }
+    .student-table td.action-cell { position:relative; padding-left:0; padding-right:0; text-align:center; overflow:visible; }
     .student-table .progress-rings { margin-left:auto; margin-right:auto; }
+    .row-actions { display:flex; position:absolute; top:50%; right:2px; z-index:2; transform:translateY(-50%); justify-content:center; gap:3px; padding:2px; border-radius:7px; background:rgba(255,255,255,.96); box-shadow:0 1px 6px rgba(32,36,42,.08); opacity:0; pointer-events:none; }
+    .student-table tbody tr:hover .row-actions { opacity:1; pointer-events:auto; }
+    .row-action-button { width:24px; height:24px; min-height:24px; display:inline-grid; place-items:center; padding:0; border-radius:6px; font-size:12px; line-height:1; }
     .add-student-module { margin-top:22px; padding-top:18px; border-top:1px solid var(--line); }
     .add-student-module h2 { margin-bottom:12px; }
     .feedback { min-height:20px; margin-top:8px; font-size:12px; line-height:1.5; color:var(--muted); }
@@ -161,6 +168,7 @@
                 <th class="name-col">姓名</th>
                 <th class="status-col">状态</th>
                 <th class="stage-col">阶段</th>
+                <th class="action-col"></th>
                 <th class="progress-col">进度</th>
               </tr>
             </thead>
@@ -204,6 +212,7 @@
       <div class="actions">
         <button id="start">开始任务</button>
         <button class="danger" id="stop">停止任务</button>
+        <button class="reset" id="clearState">重置状态</button>
         <button class="secondary" id="updateSchedule">更新时间窗</button>
         <button class="secondary" id="refreshUsers">刷新用户</button>
       </div>
@@ -269,8 +278,15 @@ async function loadUsers() {
   const data = await requestJson("/api/users");
   usersByFile = Object.fromEntries((data.users || []).map(user => [user.file, user]));
   $("user").innerHTML = data.users.map(u => `<option value="${u.file}">${u.username}</option>`).join("");
-  if (!data.users.length) $("user").innerHTML = `<option value="">暂无学员</option>`;
-  if (selectedUserFile) $("user").value = selectedUserFile;
+  if (!data.users.length) {
+    selectedUserFile = "";
+    $("user").innerHTML = `<option value="">暂无学员</option>`;
+  } else if (selectedUserFile && usersByFile[selectedUserFile]) {
+    $("user").value = selectedUserFile;
+  } else {
+    selectedUserFile = "";
+    $("user").value = "";
+  }
   applySelectedSchedule();
 }
 
@@ -291,6 +307,10 @@ function selectedJob() {
 
 function selectedUserConfig() {
   return usersByFile[selectedUserFile] || null;
+}
+
+function hasSelectedUserConfig() {
+  return Boolean(selectedUserFile && usersByFile[selectedUserFile]);
 }
 
 function studentRows() {
@@ -410,7 +430,15 @@ function jobStateClass(job) {
 
 function jobStateText(job) {
   if (!job) return "暂无任务";
-  return job.running ? "运行中" : (job.status || "-");
+  if (job.running && job.current_step === "等待学习时间") return "暂停中";
+  if (job.running) return "运行中";
+  return {
+    success: "已完成",
+    failed: "失败",
+    incomplete: "未完成",
+    stopped: "已停止",
+    stopping: "停止中"
+  }[job.status] || job.status || "-";
 }
 
 function jobStageText(job) {
@@ -706,9 +734,26 @@ function studentBoardRowHtml(row) {
     <tr class="${rowClass} ${row.user_file === selectedUserFile ? "active" : ""}" data-user-file="${escapeHtml(row.user_file)}">
       <td><span class="student-name">${escapeHtml(row.username || row.user_file)}</span></td>
       <td><span class="pill state-pill ${jobStateClass(row.job)}">${escapeHtml(jobStateText(row.job))}</span></td>
-      <td><span class="stage-text">${escapeHtml(rowStageText(row))}</span></td>
+      <td><span class="stage-text" title="${escapeHtml(rowStageText(row))}">${escapeHtml(rowStageText(row))}</span></td>
+      <td class="action-cell">${rowActionHtml(row)}</td>
       <td>${jobIndicatorHtml(row.job) || ""}</td>
     </tr>
+  `;
+}
+
+function rowActionHtml(row) {
+  if (!usersByFile[row.user_file]) return "";
+  if (row.job?.running && row.job.current_step !== "等待学习时间") {
+    return `<div class="row-actions"><button type="button" class="row-action-button danger" data-row-action="stop" data-user-file="${escapeHtml(row.user_file)}" title="停止" aria-label="停止">■</button></div>`;
+  }
+  if (!row.job) {
+    return `<div class="row-actions"><button type="button" class="row-action-button" data-row-action="run" data-user-file="${escapeHtml(row.user_file)}" title="运行" aria-label="运行">▶</button></div>`;
+  }
+  return `
+    <div class="row-actions">
+      <button type="button" class="row-action-button" data-row-action="run" data-user-file="${escapeHtml(row.user_file)}" title="运行" aria-label="运行">▶</button>
+      <button type="button" class="row-action-button reset" data-row-action="reset" data-user-file="${escapeHtml(row.user_file)}" title="重置状态" aria-label="重置状态">↺</button>
+    </div>
   `;
 }
 
@@ -725,10 +770,22 @@ function renderStudentBoard(rows) {
   const visibleRows = filteredStudentRows(rows);
   $("jobList").innerHTML = visibleRows.map(row => studentBoardRowHtml(row)).join("");
   if (!rows.length) {
-    $("jobList").innerHTML = `<tr><td colspan="4" class="hint">暂无学员。不同学员可以同时运行，同一学员只能运行一个任务。</td></tr>`;
+    $("jobList").innerHTML = `<tr><td colspan="5" class="hint">暂无学员。不同学员可以同时运行，同一学员只能运行一个任务。</td></tr>`;
   } else if (!visibleRows.length) {
-    $("jobList").innerHTML = `<tr><td colspan="4" class="hint">当前筛选下暂无学员。</td></tr>`;
+    $("jobList").innerHTML = `<tr><td colspan="5" class="hint">当前筛选下暂无学员。</td></tr>`;
   }
+  $("jobList").querySelectorAll("button[data-row-action]").forEach(button => {
+    button.onclick = async (event) => {
+      event.stopPropagation();
+      const userFile = button.dataset.userFile;
+      selectedUserFile = userFile;
+      $("user").value = userFile;
+      applySelectedSchedule(true);
+      if (button.dataset.rowAction === "run") await runSelectedJobNow(userFile);
+      if (button.dataset.rowAction === "stop") await stopSelectedJob(userFile);
+      if (button.dataset.rowAction === "reset") await clearSelectedJobState(userFile);
+    };
+  });
   $("jobList").querySelectorAll("tr[data-user-file]").forEach(item => {
     item.onclick = () => {
       selectedUserFile = item.dataset.userFile;
@@ -746,6 +803,7 @@ function renderJobs() {
   const job = selectedRow?.job || null;
   const formJob = selectedUserFile ? latestJobs.find(item => item.user_file === selectedUserFile) || null : null;
   const formRunning = Boolean(formJob && formJob.running);
+  const canActOnSelectedUser = hasSelectedUserConfig();
   const runningCount = latestJobs.filter(item => item.running).length;
   renderStudentFilters(rows);
   $("boardCount").textContent = studentFilter === "all"
@@ -756,9 +814,10 @@ function renderJobs() {
   $("logs").textContent = logLines.join("\n");
   $("logCount").textContent = `${logLines.length} 条`;
   $("logs").scrollTop = $("logs").scrollHeight;
-  $("start").disabled = formRunning || !selectedUserFile;
-  $("stop").disabled = !formRunning || !selectedUserFile;
-  $("updateSchedule").disabled = !selectedUserFile;
+  $("start").disabled = formRunning || !canActOnSelectedUser;
+  $("stop").disabled = !formRunning || !canActOnSelectedUser;
+  $("clearState").disabled = formRunning || !canActOnSelectedUser || !formJob;
+  $("updateSchedule").disabled = !canActOnSelectedUser;
 
   if (!selectedRow) {
     $("state").textContent = "请选择学员";
@@ -797,14 +856,16 @@ function renderJobs() {
   if (runningCount > 0) $("clock").textContent = `${new Date().toLocaleString()} · ${runningCount} 个任务运行中`;
 }
 
-async function startSelectedJob() {
+async function startSelectedJob(userFile = selectedUserFile) {
   try {
-    if (!selectedUserFile) return;
+    if (!userFile || !usersByFile[userFile]) return;
+    selectedUserFile = userFile;
+    $("user").value = userFile;
     await requestJson("/api/jobs", {
       method: "POST",
       body: JSON.stringify({
         action: $("action").value,
-        user_file: selectedUserFile,
+        user_file: userFile,
         finish_exam: $("finishExam").checked,
         study_windows: $("windows").value,
         keep_schedule: $("keepSchedule").checked,
@@ -817,16 +878,61 @@ async function startSelectedJob() {
   } catch (err) { alert(err.message); }
 }
 
-async function stopSelectedJob() {
-  if (!selectedUserFile) return;
-  await requestJson("/api/jobs/stop", {method:"POST", body: JSON.stringify({user_file: selectedUserFile})});
+async function stopSelectedJob(userFile = selectedUserFile) {
+  if (!userFile || !usersByFile[userFile]) return;
+  selectedUserFile = userFile;
+  $("user").value = userFile;
+  await requestJson("/api/jobs/stop", {method:"POST", body: JSON.stringify({user_file: userFile})});
   await pollState();
+}
+
+async function runSelectedJobNow(userFile = selectedUserFile) {
+  if (!userFile || !usersByFile[userFile]) return;
+  selectedUserFile = userFile;
+  $("user").value = userFile;
+  const job = latestJobs.find(item => item.user_file === userFile) || null;
+  try {
+    if (!job) {
+      await startSelectedJob(userFile);
+      return;
+    }
+    if (!job.running) {
+      await clearSelectedJobState(userFile);
+      await startSelectedJob(userFile);
+      return;
+    }
+    const data = await requestJson("/api/jobs/schedule", {
+      method: "POST",
+      body: JSON.stringify({user_file: userFile, study_windows: "", keep_schedule: true})
+    });
+    $("windows").value = "";
+    $("keepSchedule").checked = true;
+    if (data.jobs) latestJobs = data.jobs;
+    await loadUsers();
+    await pollState();
+  } catch (err) {
+    alert(err.message);
+  }
+}
+
+async function clearSelectedJobState(userFile = selectedUserFile) {
+  if (!userFile || !usersByFile[userFile]) return;
+  selectedUserFile = userFile;
+  $("user").value = userFile;
+  try {
+    const data = await requestJson("/api/jobs/clear", {method:"POST", body: JSON.stringify({user_file: userFile})});
+    latestJobs = Array.isArray(data.jobs) ? data.jobs : latestJobs.filter(job => job.user_file !== userFile);
+    renderJobs();
+  } catch (err) {
+    alert(err.message);
+  }
 }
 
 $("start").onclick = startSelectedJob;
 $("stop").onclick = stopSelectedJob;
+$("clearState").onclick = clearSelectedJobState;
 $("updateSchedule").onclick = async () => {
-  if (!selectedUserFile) return;
+  if (!hasSelectedUserConfig()) return;
   try {
     await requestJson("/api/jobs/schedule", {
       method: "POST",

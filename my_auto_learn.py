@@ -54,6 +54,10 @@ import logging
 requests.packages.urllib3.disable_warnings()
 
 
+# 请求 User-Agent 统一在这里维护，两处登录流程共用。
+DEFAULT_USER_AGENT = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36'
+
+
 # ================ 美化输出工具 ================
 
 class Colors:
@@ -1994,7 +1998,6 @@ class LoginManager:
     CACHE_MAX_AGE_SECONDS = 8 * 60 * 60
 
     def __init__(self):
-        self.UA = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/92.0.4515.159 Safari/537.36'
         self.logger = setup_logger(self.__class__.__name__)
 
     def login_zxpx(self, url_zxpx: str, cache_path: Optional[Union[str, Path]] = None) -> Tuple[dict, dict]:
@@ -2012,7 +2015,7 @@ class LoginManager:
             )
 
         headers = {
-            'User-Agent': self.UA,
+            'User-Agent': DEFAULT_USER_AGENT,
             'Accept': 'application/json, text/javascript, */*; q=0.01',
             'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
         }
@@ -2051,6 +2054,8 @@ class LoginManager:
             headers = data.get('headers') or {}
             cookies = data.get('cookies') or {}
             if not isinstance(headers, dict) or not isinstance(cookies, dict) or not cookies:
+                return None
+            if headers.get('User-Agent') != DEFAULT_USER_AGENT:
                 return None
             return headers, cookies
         except Exception as e:
@@ -2362,9 +2367,8 @@ def _decode_read(path: Path) -> Tuple[str, str]:
 
 def _login(authCode: str = '') -> Tuple[str, str]:
     """通过authCode登录 - 统一输出风格"""
-    UA = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/92.0.4515.159 Safari/537.36'
     headers = {
-        'User-Agent': UA,
+        'User-Agent': DEFAULT_USER_AGENT,
         'Accept': 'application/json, text/javascript, */*; q=0.01',
         'Accept-Language': 'zh-CN,zh;q=0.9',
         'Accept-Encoding': 'gzip, deflate, br'
