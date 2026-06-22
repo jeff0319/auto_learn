@@ -643,7 +643,13 @@ def api_start_job(payload: JobRequest):
 @app.post("/api/jobs/stop")
 def api_stop_job(payload: StopJobRequest):
     with job_lock:
-        target_jobs = [jobs[payload.user_file]] if payload.user_file and payload.user_file in jobs else list(jobs.values())
+        if payload.user_file:
+            user_path_from_name(payload.user_file)
+            if payload.user_file not in jobs:
+                raise HTTPException(status_code=404, detail="该学员暂无任务")
+            target_jobs = [jobs[payload.user_file]]
+        else:
+            target_jobs = list(jobs.values())
         for job in target_jobs:
             if job.process is None or job.process.poll() is not None:
                 continue
@@ -666,8 +672,7 @@ def api_clear_job(payload: ClearJobRequest):
         if not job:
             return {"ok": True, "jobs": [job.snapshot() for job in jobs.values()]}
         if job.process is not None and job.process.poll() is None:
-            job.stop_event.set()
-            job.process.terminate()
+            raise HTTPException(status_code=409, detail="任务运行中，不能重置状态")
         jobs.pop(payload.user_file, None)
         return {"ok": True, "jobs": [job.snapshot() for job in jobs.values()]}
 

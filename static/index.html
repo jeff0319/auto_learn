@@ -256,7 +256,7 @@ const $ = (id) => document.getElementById(id);
 const nowYear = new Date().getFullYear();
 let latestJobs = [];
 let selectedUserFile = "";
-let studentFilter = "running";
+let studentFilter = "all";
 let usersByFile = {};
 let videoTickAnchors = {};
 $("year").value = nowYear;
@@ -284,8 +284,8 @@ async function loadUsers() {
   } else if (selectedUserFile && usersByFile[selectedUserFile]) {
     $("user").value = selectedUserFile;
   } else {
-    selectedUserFile = "";
-    $("user").value = "";
+    selectedUserFile = data.users[0].file;
+    $("user").value = selectedUserFile;
   }
   applySelectedSchedule();
 }
@@ -350,9 +350,7 @@ function studentPriority(row) {
 function studentFilterKey(row) {
   const job = row.job;
   if (job?.running) return "running";
-  if (job?.status === "failed" || job?.status === "incomplete") return "attention";
-  if (job?.status === "stopping") return "stopping";
-  if (job?.status === "success" || job?.status === "stopped") return "done";
+  if (job) return "done";
   return "idle";
 }
 
@@ -374,6 +372,7 @@ function renderStudentFilters(rows) {
     acc[key] = (acc[key] || 0) + 1;
     return acc;
   }, {all: rows.length});
+  if (!studentFilterLabels[studentFilter]) studentFilter = "all";
   const filters = ["all", "running", "done", "idle"];
   $("studentFilters").innerHTML = filters.map(key => `
     <button type="button" class="filter-button ${studentFilter === key ? "active" : ""}" data-filter="${key}">
@@ -418,6 +417,7 @@ function taskModeText(job) {
 
 function jobStateClass(job) {
   if (!job) return "";
+  if (job.status === "stopping") return "stopping";
   if (job.running) return job.current_step === "等待学习时间" ? "running waiting" : "running";
   return {
     success: "success",
@@ -430,6 +430,7 @@ function jobStateClass(job) {
 
 function jobStateText(job) {
   if (!job) return "暂无任务";
+  if (job.status === "stopping") return "停止中";
   if (job.running && job.current_step === "等待学习时间") return "暂停中";
   if (job.running) return "运行中";
   return {
@@ -443,6 +444,7 @@ function jobStateText(job) {
 
 function jobStageText(job) {
   if (!job) return "-";
+  if (job.status === "stopping") return job.current_step || "正在停止";
   if (job.running && job.current_step === "等待学习时间") {
     return waitUntilText(job);
   }
@@ -743,7 +745,8 @@ function studentBoardRowHtml(row) {
 
 function rowActionHtml(row) {
   if (!usersByFile[row.user_file]) return "";
-  if (row.job?.running && row.job.current_step !== "等待学习时间") {
+  if (row.job?.status === "stopping") return "";
+  if (row.job?.running) {
     return `<div class="row-actions"><button type="button" class="row-action-button danger" data-row-action="stop" data-user-file="${escapeHtml(row.user_file)}" title="停止" aria-label="停止">■</button></div>`;
   }
   if (!row.job) {
@@ -760,6 +763,7 @@ function rowActionHtml(row) {
 function rowStageText(row) {
   const job = row.job;
   if (!job) return "-";
+  if (job.status === "stopping") return job.current_step || "正在停止";
   if (job.running) return compactJobStageText(job) || "运行中";
   if (job.status === "success") return "已完成";
   if (job.status === "stopped") return "已停止";
@@ -803,6 +807,7 @@ function renderJobs() {
   const job = selectedRow?.job || null;
   const formJob = selectedRow?.job || null;
   const formRunning = Boolean(formJob && formJob.running);
+  const formStopping = Boolean(formJob && formJob.status === "stopping");
   const canActOnSelectedUser = Boolean(selectedRow && usersByFile[selectedRow.user_file]);
   const runningCount = latestJobs.filter(item => item.running).length;
   renderStudentFilters(rows);
@@ -814,9 +819,9 @@ function renderJobs() {
   $("logs").textContent = logLines.join("\n");
   $("logCount").textContent = `${logLines.length} 条`;
   $("logs").scrollTop = $("logs").scrollHeight;
-  $("start").disabled = formRunning || !canActOnSelectedUser;
-  $("stop").disabled = !formRunning || !canActOnSelectedUser;
-  $("clearState").disabled = formRunning || !canActOnSelectedUser || !formJob;
+  $("start").disabled = formRunning || formStopping || !canActOnSelectedUser;
+  $("stop").disabled = !formRunning || formStopping || !canActOnSelectedUser;
+  $("clearState").disabled = formRunning || formStopping || !canActOnSelectedUser || !formJob;
   $("updateSchedule").disabled = !canActOnSelectedUser;
 
   if (!selectedRow) {
@@ -882,8 +887,12 @@ async function stopSelectedJob(userFile = selectedUserFile) {
   if (!userFile || !usersByFile[userFile]) return;
   selectedUserFile = userFile;
   $("user").value = userFile;
-  await requestJson("/api/jobs/stop", {method:"POST", body: JSON.stringify({user_file: userFile})});
-  await pollState();
+  try {
+    await requestJson("/api/jobs/stop", {method:"POST", body: JSON.stringify({user_file: userFile})});
+    await pollState();
+  } catch (err) {
+    alert(err.message);
+  }
 }
 
 async function runSelectedJobNow(userFile = selectedUserFile) {
@@ -901,15 +910,7 @@ async function runSelectedJobNow(userFile = selectedUserFile) {
       await startSelectedJob(userFile);
       return;
     }
-    const data = await requestJson("/api/jobs/schedule", {
-      method: "POST",
-      body: JSON.stringify({user_file: userFile, study_windows: "", keep_schedule: true})
-    });
-    $("windows").value = "";
-    $("keepSchedule").checked = true;
-    if (data.jobs) latestJobs = data.jobs;
-    await loadUsers();
-    await pollState();
+    alert("任务已经在运行中。如需立刻改为全天运行，请清空学习时间窗后点击“更新时间窗”。");
   } catch (err) {
     alert(err.message);
   }
@@ -948,8 +949,12 @@ $("updateSchedule").onclick = async () => {
   } catch (err) { alert(err.message); }
 };
 $("refreshUsers").onclick = async () => {
-  await loadUsers();
-  renderJobs();
+  try {
+    await loadUsers();
+    renderJobs();
+  } catch (err) {
+    alert(err.message);
+  }
 };
 $("user").onchange = () => {
   selectedUserFile = $("user").value;
